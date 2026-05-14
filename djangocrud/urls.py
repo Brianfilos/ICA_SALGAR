@@ -68,6 +68,7 @@ urlpatterns = [
     # Exportación Excel/CSV
     path('gestion/reportes/exportar/visitas/excel/', views.exportar_visitas_excel, name='exportar_visitas_excel'),
     path('gestion/reportes/exportar/rit/excel/', views.exportar_excel_rit, name='exportar_excel_rit'),
+    path('pdf/rit/zip/', views.descargar_zip_rits, name='descargar_zip_rits'),
     path('gestion/reportes/exportar/ica/excel/', views.exportar_excel_ica, name='exportar_excel_ica'),
     path('gestion/reportes/exportar/rit/csv/', views.exportar_csv_rit, name='exportar_csv_rit'),
     path('gestion/reportes/exportar/ica/csv/', views.exportar_csv_ica, name='exportar_csv_ica'),

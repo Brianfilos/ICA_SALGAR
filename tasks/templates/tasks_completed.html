@@ -363,6 +363,14 @@
     </div>
   {% endif %}
 
+  {% if is_admin or is_alcaldia %}
+  <div class="mt-3">
+    <a href="{% url 'descargar_zip_rits' %}" class="btn btn-dark">
+      <i class="bi bi-file-zip"></i> Descargar todos los RITs en ZIP
+    </a>
+  </div>
+  {% endif %}
+
   <div class="mt-4">
     <a href="{% url 'tasks' %}" class="btn btn-outline-secondary">
       <i class="bi bi-arrow-left"></i> Volver al Panel

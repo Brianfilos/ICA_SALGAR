@@ -728,6 +728,7 @@ def tasks_completed(request):
         "visitas": visitas,
         "is_admin": is_admin_user,
         "is_revisor": is_revisor_user,
+        "is_alcaldia": is_alcaldia,
         "puede_ver_todo": puede_ver_todo,
         "es_contribuyente": es_contribuyente_user,
         "filtro_documento": filtro_documento,
@@ -3166,6 +3167,45 @@ def generar_pdf_rit(request, rit_id):
     response = HttpResponse(buffer, content_type='application/pdf')
     disp = 'inline' if request.GET.get('inline') else 'attachment'
     response['Content-Disposition'] = f'{disp}; filename="RIT_{rit.radicado or rit.id}.pdf"'
+    return response
+
+
+@login_required
+def descargar_zip_rits(request):
+    """Descarga masiva de PDFs de RITs en un ZIP. Solo para admin y alcaldía."""
+    import zipfile
+
+    if not (is_admin(request.user) or is_alcaldia_gestion(request.user)):
+        messages.error(request, 'No tienes permiso para esta acción.')
+        return redirect('tasks_completed')
+
+    rits = RegistroRIT.objects.select_related('user').order_by('-fecha')
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for rit in rits:
+            try:
+                nombre_archivo = f"RIT_{rit.radicado or rit.id}_{rit.nombre_razon_social or 'sin_nombre'}.pdf"
+                nombre_archivo = nombre_archivo.replace('/', '-').replace('\\', '-')[:100]
+
+                if rit.pdf_fisico:
+                    rit.pdf_fisico.open('rb')
+                    pdf_bytes = rit.pdf_fisico.read()
+                    rit.pdf_fisico.close()
+                else:
+                    request._rit_public = True
+                    resp = generar_pdf_rit(request, rit.id)
+                    del request._rit_public
+                    pdf_bytes = resp.content if hasattr(resp, 'content') else b''
+
+                if pdf_bytes:
+                    zf.writestr(nombre_archivo, pdf_bytes)
+            except Exception:
+                continue
+
+    zip_buffer.seek(0)
+    response = HttpResponse(zip_buffer.read(), content_type='application/zip')
+    response['Content-Disposition'] = 'attachment; filename="RITs_Salgar.zip"'
     return response
 
 
