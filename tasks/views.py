@@ -2920,6 +2920,23 @@ def generar_pdf_rit(request, rit_id):
             messages.error(request, 'No tienes permiso para ver este documento.')
             return redirect('tasks_completed')
 
+    # Si la alcaldía cargó un PDF físico, servirlo directamente
+    if rit.pdf_fisico:
+        from django.http import FileResponse
+        import mimetypes
+        try:
+            file_handle = rit.pdf_fisico.open('rb')
+            mime_type, _ = mimetypes.guess_type(rit.pdf_fisico.name)
+            mime_type = mime_type or 'application/octet-stream'
+            inline = request.GET.get('inline', '0') == '1'
+            disposition = 'inline' if inline else 'attachment'
+            filename = f"RIT_{rit.radicado}.pdf"
+            response = FileResponse(file_handle, content_type=mime_type)
+            response['Content-Disposition'] = f'{disposition}; filename="{filename}"'
+            return response
+        except Exception:
+            pass  # Si falla la lectura del archivo, genera el PDF normalmente
+
     # Obtener configuración de PDF
     config = get_pdf_config()
 
