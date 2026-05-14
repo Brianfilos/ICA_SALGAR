@@ -164,7 +164,7 @@
     </div>
 
     <!-- SECCIÓN C: REPRESENTANTES LEGALES -->
-    <div class="card mb-3">
+    <div class="card mb-3" id="seccion-representantes">
       <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
         <strong>C. REPRESENTANTES LEGALES / SUPLENTES</strong>
         <button type="button" class="btn btn-sm btn-light" id="add-representante">+ Agregar</button>
@@ -384,6 +384,15 @@ $(document).ready(function() {
     } else { $('#bloque-juridica').hide(); $('#id_tipo_juridica').val(''); $('#bloque-otro').hide(); $('#id_otro_tipo_juridica').val(''); }
   }
   $('#id_tipo_persona').on('change', toggleTipoJuridica); toggleTipoJuridica();
+
+  function toggleRepresentantes() {
+    if ($('#id_tipo_persona').val() === 'NATURAL') {
+      $('#seccion-representantes').hide();
+    } else {
+      $('#seccion-representantes').show();
+    }
+  }
+  $('#id_tipo_persona').on('change', toggleRepresentantes); toggleRepresentantes();
 
   function toggleOtroTipoJuridica() {
     if ($('#id_tipo_juridica').val() === 'OTRO' && $('#id_tipo_persona').val() === 'JURIDICA') { $('#bloque-otro').show(); } else { $('#bloque-otro').hide(); $('#id_otro_tipo_juridica').val(''); }
