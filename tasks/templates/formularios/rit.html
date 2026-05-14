@@ -317,7 +317,7 @@
     <!-- ========================= -->
     <!-- SECCIÓN C: REPRESENTACIÓN LEGAL -->
     <!-- ========================= -->
-    <div class="card mb-3">
+    <div class="card mb-3" id="seccion-representantes">
       <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
         <strong>C. REPRESENTACIÓN LEGAL</strong>
         <button type="button" class="btn btn-sm btn-light" id="add-representante">
@@ -739,6 +739,20 @@ $(document).ready(function() {
 
   $('#id_tipo_persona').on('change', toggleTipoJuridica);
   toggleTipoJuridica();
+
+  // =====================
+  // Ocultar representantes para persona natural
+  // =====================
+  function toggleRepresentantes() {
+    const tipoPers = $('#id_tipo_persona').val();
+    if (tipoPers === 'NATURAL') {
+      $('#seccion-representantes').hide();
+    } else {
+      $('#seccion-representantes').show();
+    }
+  }
+  $('#id_tipo_persona').on('change', toggleRepresentantes);
+  toggleRepresentantes();
 
   // =====================
   // Otro tipo jurídico si OTRO
