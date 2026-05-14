@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-3">Procesos disponibles</h2>
+
+  {% if procesos %}
+    <div class="row g-3">
+      {% for p in procesos %}
+        {% if p.id in habilitados_ids %}
+          {# ─── PROCESO HABILITADO ─── #}
+          <div class="col-12 col-md-6 col-lg-4">
+            <div class="card shadow-sm h-100">
+              <div class="card-body">
+                <h5 class="card-title">{{ p.nombre }}</h5>
+
+                {% if p.codigo == 'RIT' %}
+                  {% if estado_rit == 'SIN_RIT' or estado_rit == 'CANCELADO' %}
+                    <p class="text-muted mb-3">
+                      {% if estado_rit == 'CANCELADO' %}
+                        Tu RIT anterior fue cancelado. Puedes realizar una nueva inscripción.
+                      {% else %}
+                        Inscribe tu RIT para comenzar.
+                      {% endif %}
+                    </p>
+                    <div class="d-grid gap-2">
+                      <a href="{% url 'proceso_rit' %}?opcion=INSCRIPCION" class="btn btn-institucional">
+                        <i class="bi bi-file-earmark-plus"></i> Nueva Inscripción RIT
+                      </a>
+                    </div>
+                  {% elif estado_rit == 'PENDIENTE_FIRMA' %}
+                    {# RIT incompleto: el contribuyente debe completar la firma #}
+                    <p class="text-muted mb-3">
+                      Tu inscripción RIT está pendiente de firma.<br>
+                      <small>Radicado: <strong>{{ rit_pendiente_panel.radicado|default:"Asignado al firmar" }}</strong></small>
+                    </p>
+                    <div class="d-grid gap-2">
+                      <a href="{% url 'proceso_rit' %}?opcion=COMPLETAR"
+                         class="btn btn-warning fw-bold">
+                        <i class="bi bi-pen"></i> Completar inscripción RIT
+                      </a>
+                    </div>
+                  {% else %}
+                    <p class="text-muted mb-3">
+                      RIT Activo - Radicado: <strong>{{ rit_activo.radicado|default:"N/A" }}</strong>
+                    </p>
+                    {% if rit_activo.firma_otp_verificada %}
+                    <p class="mb-3">
+                      <span class="badge bg-success">
+                        <i class="bi bi-patch-check-fill"></i> Firmado electrónicamente (OTP)
+                      </span>
+                    </p>
+                    {% endif %}
+                    <div class="d-grid gap-2">
+                      <button type="button" class="btn btn-institucional"
+                              data-bs-toggle="modal" data-bs-target="#modalRIT">
+                        <i class="bi bi-gear"></i> Gestionar RIT
+                      </button>
+                    </div>
+                  {% endif %}
+                {% else %}
+                  <p class="text-muted mb-3">Proceso habilitado para tu usuario.</p>
+                  <a class="btn btn-institucional w-100" href="/proceso/{{ p.codigo }}/">
+                    Iniciar
+                  </a>
+                {% endif %}
+
+              </div>
+            </div>
+          </div>
+
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-warning">
+      No hay procesos registrados en el sistema.
+    </div>
+  {% endif %}
+
+  <div class="mt-4">
+    <a href="{% url 'tasks_completed' %}" class="btn btn-outline-secondary">
+      Ver procesos completados
+    </a>
+  </div>
+</div>
+
+<!-- Modal para RIT (solo se muestra si tiene RIT activo) -->
+{% if estado_rit == 'ACTIVO' and rit_activo %}
+<div class="modal fade" id="modalRIT" tabindex="-1" aria-labelledby="modalRITLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title" id="modalRITLabel">Gestión de RIT</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info mb-3">
+          <strong>RIT Activo:</strong> {{ rit_activo.radicado|default:"Sin radicado" }}<br>
+          <small class="text-muted">{{ rit_activo.nombre_razon_social }}</small>
+        </div>
+
+        <p class="mb-3">Seleccione la acción que desea realizar:</p>
+
+        <div class="d-grid gap-3">
+          <a href="{% url 'proceso_rit' %}?opcion=ACTUALIZACION" class="btn btn-primary btn-lg">
+            <i class="bi bi-pencil-square"></i> Actualización
+            <small class="d-block fw-normal">Modificar dirección, teléfono o correo</small>
+          </a>
+
+          <a href="{% url 'proceso_rit' %}?opcion=CANCELACION" class="btn btn-danger btn-lg">
+            <i class="bi bi-x-circle"></i> Cancelación
+            <small class="d-block fw-normal">Cancelar total o parcialmente el RIT</small>
+          </a>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

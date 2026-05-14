@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<main class="container mt-5">
+
+  <div class="row justify-content-center">
+    <div class="col-12 col-md-6 col-lg-5">
+
+      <div class="card shadow border-0">
+
+        <!-- Header con logo -->
+        <div class="card-header text-center text-white py-4" style="background-color: var(--verde);">
+          <div class="mb-3">
+            <img src="{% static 'img/logo_ciudad.png' %}" style="height:90px; width:auto;">
+          </div>
+          <h4 class="mb-1 fw-bold" style="color:#fff;">Portal Tributario</h4>
+          <p class="mb-0" style="color:#fff;">Municipio de Salgar - Antioquia</p>
+        </div>
+
+        <!-- Formulario -->
+        <div class="card-body p-4 p-md-5">
+
+          {% if success %}
+            <div class="alert alert-success mb-4">
+              {{ success }}
+            </div>
+          {% endif %}
+
+          {% if error %}
+            <div class="alert alert-danger mb-4">
+              {{ error }}
+            </div>
+          {% endif %}
+
+          <form action="{% url 'signin' %}" method="post" novalidate data-loading="true" data-loading-text="Iniciando sesión...">
+            {% csrf_token %}
+
+            <!-- Usuario -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Usuario</label>
+              <input
+                type="text"
+                name="username"
+                class="form-control form-control-lg"
+                placeholder="Ingresa tu usuario"
+                autocomplete="username"
+                required
+              >
+            </div>
+
+            <!-- Contraseña -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Contraseña</label>
+              <div class="input-group">
+                <input
+                  type="password"
+                  id="password-input"
+                  name="password"
+                  class="form-control form-control-lg"
+                  placeholder="Ingresa tu contraseña"
+                  autocomplete="current-password"
+                  required
+                >
+                <button class="btn btn-outline-secondary" type="button" tabindex="-1"
+                  onclick="var i=document.getElementById('password-input'); var ic=this.querySelector('i'); if(i.type==='password'){i.type='text';ic.classList.replace('bi-eye','bi-eye-slash');}else{i.type='password';ic.classList.replace('bi-eye-slash','bi-eye');}">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="d-grid mt-4">
+              <button type="submit" class="btn btn-institucional btn-lg">
+                <span class="btn-text">Iniciar Sesión</span>
+              </button>
+            </div>
+          </form>
+
+          <hr>
+
+          <p class="text-center mt-3 mb-1">
+            <a href="{% url 'recuperar_contrasena' %}" class="link-registro">¿Olvidaste tu contraseña?</a>
+          </p>
+
+          <p class="text-center mb-0">
+            ¿No tienes cuenta?
+            <a href="{% url 'signup' %}" class="link-registro">Regístrate aquí</a>
+          </p>
+
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="text-center mt-4 mb-3">
+        <p class="mb-2" style="font-size: 0.8rem; font-family:Arial,sans-serif; color:#666;">
+          Desarrollado por
+        </p>
+        <img
+          src="{% static 'img/logo_legal.png' %}"
+          height="80"
+          alt="Legal Developments S.A.S."
+          style="opacity: 0.85; transition: opacity 0.3s ease;"
+          onmouseover="this.style.opacity='1'"
+          onmouseout="this.style.opacity='0.85'"
+        >
+      </div>
+
+    </div>
+  </div>
+
+</main>
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('toggle-password').addEventListener('click', function () {
+      const input = document.getElementById('password-input');
+      const icon  = document.getElementById('toggle-icon');
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
+      } else {
+        input.type = 'password';
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
+      }
+    });
+  });
+</script>
+{% endblock %}
+
+{% endblock %}
+

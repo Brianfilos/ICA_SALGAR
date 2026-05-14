@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+
+      <div class="card shadow">
+        <div class="card-header bg-dark text-white text-center">
+          <h5 class="mb-0">FIRMA ELECTRÓNICA — DECLARACIÓN ICA</h5>
+        </div>
+        <div class="card-body p-4">
+
+          <!-- Barra de progreso de pasos -->
+          {% if pasos %}
+          <div class="mb-4">
+            <div class="d-flex justify-content-center gap-2 flex-wrap">
+              {% for paso in pasos %}
+                <span class="badge {% if paso == paso_actual %}bg-dark{% else %}bg-secondary{% endif %} px-3 py-2">
+                  {% if paso != paso_actual %}✓ {% endif %}{{ paso }}
+                </span>
+                {% if not forloop.last %}<span class="text-muted align-self-center">→</span>{% endif %}
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="text-center mb-4">
+            <div style="font-size:3rem;">✉️</div>
+            <h6 class="mt-2">Verificación de identidad — <strong>{{ rol }}</strong></h6>
+            <p class="text-muted mb-1">
+              Se envió un código de 6 dígitos a:
+            </p>
+            <strong>{{ email }}</strong>
+          </div>
+
+          {% if messages %}
+            {% for msg in messages %}
+              <div class="alert alert-{{ msg.tags }}">{{ msg }}</div>
+            {% endfor %}
+          {% endif %}
+
+          {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+          {% endif %}
+
+          <div class="alert alert-info small">
+            <strong>¿Por qué se requiere este código?</strong><br>
+            Conforme a la Ley 527 de 1999 (Colombia), este código constituye la
+            <strong>firma electrónica simple</strong> del <strong>{{ rol }}</strong>,
+            validando su identidad en la declaración presentada.
+            El código tiene una vigencia de <strong>15 minutos</strong>.
+          </div>
+
+          <!-- Formulario de verificación -->
+          <form method="post" autocomplete="off">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="verificar">
+
+            <div class="mb-4">
+              <label class="form-label fw-bold text-center d-block">Código de verificación *</label>
+              <input
+                type="text"
+                name="codigo"
+                class="form-control form-control-lg text-center"
+                style="letter-spacing:12px;font-size:2rem;font-weight:bold;"
+                maxlength="6"
+                pattern="[0-9]{6}"
+                inputmode="numeric"
+                placeholder="_ _ _ _ _ _"
+                autofocus
+                required
+              >
+              <div class="form-text text-center">Ingrese los 6 dígitos recibidos en el correo del {{ rol }}.</div>
+            </div>
+
+            <div class="d-grid mb-3">
+              <button type="submit" class="btn btn-institucional btn-lg">
+                ✓ Confirmar firma — {{ rol }}
+              </button>
+            </div>
+          </form>
+
+          <!-- Reenviar código -->
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reenviar">
+            <div class="text-center">
+              <p class="text-muted small mb-1">¿No recibió el código?</p>
+              <button type="submit" class="btn btn-outline-secondary btn-sm">
+                Reenviar código al {{ rol }}
+              </button>
+            </div>
+          </form>
+
+          <hr class="my-4">
+
+          <div class="text-center">
+            <small class="text-muted">
+              Declaración ICA &mdash; Radicado: <strong>{{ declaracion.radicado|default:declaracion.id }}</strong><br>
+              Año gravable: <strong>{{ declaracion.anio_gravable }}</strong> &mdash;
+              Total a pagar: <strong>${{ declaracion.total_a_pagar|floatformat:0 }}</strong>
+            </small>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // Auto-formato: solo números
+  document.querySelector('input[name="codigo"]').addEventListener('input', function() {
+    this.value = this.value.replace(/\D/g, '').substring(0, 6);
+  });
+</script>
+{% endblock %}

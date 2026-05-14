@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<main class="container mt-5">
+
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+
+            <section class="card shadow border-0">
+
+                <!-- Header institucional -->
+                <div class="card-header text-white text-center py-4" style="background-color: #4B5563;">
+                    <div class="mb-3">
+                        <img src="{% static 'img/logo_ciudad.png' %}" style="height:90px; width:auto;">
+                    </div>
+                    <h1 class="display-5 fw-bold mb-0" style="font-family:'Arial Rounded MT Bold',Arial,sans-serif; text-transform:uppercase; color:#fff;">Portal Territorial</h1>
+                    <p class="mt-2 mb-0" style="font-family:'Arial Rounded MT Bold',Arial,sans-serif; color:#fff;">Municipio de Salgar - Antioquia</p>
+                </div>
+
+                <!-- Contenido -->
+                <div class="card-body text-center py-5">
+                    <p class="fs-5" style="font-family:Arial,sans-serif; color:#000000;">
+                        Tu declaración de Industria y Comercio, sin enredos.
+                        Presenta tu impuesto de forma fácil, rápida y segura desde un solo lugar.
+                    </p>
+
+                    <a href="{% url 'signin' %}"
+                    class="btn btn-lg mt-3 text-white"
+                    style="background-color:#4B5563; border-color:#4B5563; font-family:'Arial Rounded MT Bold',Arial,sans-serif;">
+                    Ingresar al Portal
+                    </a>
+
+                </div>
+
+            </section>
+
+            <!-- Footer -->
+            <div class="text-center mt-4 mb-3">
+                <p class="mb-2" style="font-size: 0.8rem; font-family:Arial,sans-serif; color:#666;">
+                    Desarrollado por
+                </p>
+                <img
+                    src="{% static 'img/logo_legal.png' %}"
+                    height="45"
+                    alt="Legal Developments S.A.S."
+                    style="opacity: 0.85; transition: opacity 0.3s ease;"
+                    onmouseover="this.style.opacity='1'"
+                    onmouseout="this.style.opacity='0.85'"
+                >
+            </div>
+
+        </div>
+    </div>
+
+</main>
+{% endblock %}
+

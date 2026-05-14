@@ -1,0 +1,634 @@
+{% load auth_extras %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Declaración de Industria y Comercio</title>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- Fuente Gilroy -->
+    <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/gilroy-free">
+
+    <!-- Estilos institucionales -->
+    <style>
+        /* ========================= */
+        /* VARIABLES DE MARCA SALGAR */
+        /* ========================= */
+        :root{
+            --verde:         #4B5563;  /* Gris primario — Títulos, subtítulos, líneas de diseño */
+            --verde-hover:   #374151;  /* Hover gris primario */
+            --verde-limón:   #6B7280;  /* Gris secundario — Info complementaria */
+            --negro:         #000000;  /* Textos descriptivos e información general */
+            --azul:          #00A0E4;  /* Azul secundario */
+            --rojo:          #DC0B2C;  /* Rojo primario */
+            --naranja:       #FF5900;  /* Naranja secundario */
+            --morado:        #8A4AA3;  /* Morado secundario */
+            --amarillo:      #FCDC00;  /* Amarillo primario */
+        }
+
+        /* ========================= */
+        /* TIPOGRAFÍA INSTITUCIONAL  */
+        /* ========================= */
+        body {
+            background: #f4f6f9;
+            font-family: 'Gilroy', Arial, sans-serif;
+            color: var(--negro);
+            font-size: 1rem;
+        }
+
+        /* H1 — Título principal: MAYÚSCULA, Gilroy ExtraBold, verde oscuro, subrayado */
+        h1 {
+            font-family: 'Gilroy', Arial, sans-serif;
+            font-weight: 800;
+            color: var(--verde);
+            text-transform: uppercase;
+            text-decoration: underline;
+        }
+
+        /* H2, H3 — Subtítulos: Gilroy ExtraBold, verde oscuro, subrayado */
+        h2, h3 {
+            font-family: 'Gilroy', Arial, sans-serif;
+            font-weight: 800;
+            color: var(--verde);
+            text-decoration: underline;
+        }
+
+        /* H4, H5, H6 — Info complementaria: Gilroy ExtraBold, verde secundario */
+        h4, h5, h6 {
+            font-family: 'Gilroy', Arial, sans-serif;
+            font-weight: 800;
+            color: var(--verde-limón);
+        }
+
+        /* Párrafos y texto general: Gilroy, negro */
+        p, li, td, th, label, span:not(.navbar-toggler-icon):not(.icon-line) {
+            font-family: 'Gilroy', Arial, sans-serif;
+            color: var(--negro);
+        }
+
+        /* Anulamos el gris de Bootstrap .text-muted */
+        .text-muted {
+            color: var(--negro) !important;
+            opacity: 0.75;
+        }
+
+        /* card-title usa h5 → heredará verde-limón */
+        .card-title {
+            font-family: 'Gilroy', Arial, sans-serif;
+            font-weight: 800;
+            color: var(--verde-limón);
+        }
+
+        /* card-text usa p → negro */
+        .card-text {
+            font-family: 'Gilroy', Arial, sans-serif;
+            color: var(--negro);
+        }
+
+        /* Modal title */
+        .modal-title {
+            font-family: 'Gilroy', Arial, sans-serif;
+            font-weight: 800;
+            color: var(--verde);
+        }
+
+        /* ========================= */
+        /* OVERLAY DE CARGA */
+        /* ========================= */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #e0e0e0;
+            border-top: 4px solid var(--verde);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            font-size: 1.1rem;
+            color: var(--negro);
+            font-weight: 500;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-pulse {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* ========================= */
+        /* ANIMACIONES DE ENTRADA */
+        /* ========================= */
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .slide-in-left {
+            animation: slideInLeft 0.4s ease-out;
+        }
+
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* ========================= */
+        /* BADGE DE BIENVENIDA */
+        /* ========================= */
+        .user-welcome {
+            display: flex;
+            align-items: center;
+            padding: 6px 12px;
+            background: rgba(75, 85, 99, 0.15);
+            border-radius: 20px;
+            margin-right: 15px;
+        }
+
+        .user-welcome i {
+            margin-right: 8px;
+            color: #ffffff;
+        }
+
+        .user-welcome span {
+            color: #ffffff !important;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .user-welcome strong {
+            color: #FCDC00;
+            border: 1.5px solid #FCDC00;
+            border-radius: 6px;
+            padding: 1px 6px;
+        }
+
+        /* ========================= */
+        /* LOGO EN NAVBAR */
+        /* ========================= */
+        .navbar-logo {
+            height: 50px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        /* ========================= */
+        /* CARDS Y FORMULARIOS */
+        /* ========================= */
+        .card {
+            border-radius: 16px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+
+        .card-header {
+            border-radius: 16px 16px 0 0;
+        }
+
+        .form-control {
+            border-radius: 10px;
+            padding: 12px 15px;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 6px rgba(0,0,0,.08);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .form-control:focus {
+            border-color: var(--verde);
+            box-shadow: 0 0 0 0.2rem rgba(75, 85, 99, 0.25);
+        }
+
+        /* Botón institucional */
+        .btn-institucional {
+            background-color: var(--verde);
+            border-color: var(--verde);
+            color: #fff;
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 1.1rem;
+            font-family: 'Gilroy', Arial, sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        .btn-institucional:hover {
+            background-color: var(--verde-hover);
+            border-color: var(--verde-hover);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(75, 85, 99, 0.3);
+        }
+
+        /* Botón con spinner */
+        .btn-loading {
+            position: relative;
+            pointer-events: none;
+        }
+
+        .btn-loading .btn-text {
+            visibility: hidden;
+        }
+
+        .btn-loading::after {
+            content: "";
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            margin-left: -10px;
+            margin-top: -10px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        /* Link institucional */
+        .link-registro {
+            color: var(--azul);
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .link-registro:hover {
+            text-decoration: underline;
+            color: var(--verde);
+        }
+
+        /* Navbar */
+        .navbar-brand {
+            font-family: 'Gilroy', Arial, sans-serif;
+            font-weight: 700;
+            letter-spacing: .3px;
+        }
+
+        .navbar {
+            transition: all 0.3s ease;
+        }
+
+        .nav-link {
+            font-family: 'Gilroy', Arial, sans-serif;
+            transition: all 0.2s ease;
+            position: relative;
+            color: #ffffff !important;
+        }
+
+        .nav-link:hover {
+            transform: translateY(-2px);
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: 0;
+            left: 50%;
+            background-color: var(--verde-limón);
+            transition: all 0.3s ease;
+        }
+
+        .nav-link:hover::after {
+            width: 100%;
+            left: 0;
+        }
+
+        /* ========================= */
+        /* TOAST DE NOTIFICACIONES */
+        /* ========================= */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 9998;
+        }
+
+        .custom-toast {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            min-width: 300px;
+            animation: slideInRight 0.4s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(100px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .toast-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 1.2rem;
+        }
+
+        .toast-icon.success {
+            background: rgba(75, 85, 99, 0.15);
+            color: var(--verde);
+        }
+
+        .toast-icon.info {
+            background: rgba(0, 160, 228, 0.15);
+            color: var(--azul);
+        }
+
+        .toast-content h6 {
+            margin: 0;
+            font-family: 'Gilroy', Arial, sans-serif;
+            color: var(--verde-limón);
+        }
+
+        .toast-content p {
+            margin: 4px 0 0;
+            font-size: 0.9rem;
+            color: var(--negro);
+        }
+
+        /* ========================= */
+        /* LÍNEAS DECORATIVAS */
+        /* ========================= */
+        hr, .linea-decorativa {
+            border-color: var(--verde);
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- Overlay de carga global -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text loading-pulse">Cargando...</div>
+</div>
+
+<!-- Toast container para notificaciones -->
+<div class="toast-container" id="toastContainer"></div>
+
+<nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #4B5563;">
+  <div class="container">
+
+    <!-- Brand: cambia según rol -->
+    <a class="navbar-brand"
+       href="{% if user.is_authenticated and user|has_group:'ADMIN' %}
+                {% url 'admin_panel' %}
+             {% elif user.is_authenticated %}
+                {% url 'tasks' %}
+             {% else %}
+                {% url 'home' %}
+             {% endif %}">
+      <img src="{% static 'img/logo_ciudad.png' %}" alt="Alcaldía Salgar" class="navbar-logo me-2">
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+      aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto align-items-center">
+
+        {% if user.is_authenticated %}
+
+          <!-- Badge de bienvenida -->
+          <li class="nav-item">
+            <div class="user-welcome slide-in-left">
+              <i class="bi bi-person-circle"></i>
+              <span>Bienvenido, <strong>{{ user.perfil.nombre_razon_social|default:user.get_full_name|default:user.username }}</strong></span>
+            </div>
+          </li>
+
+          <!-- Menú ADMIN -->
+          {% if user|has_group:'ADMIN' %}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'admin_panel' %}">
+                <i class="bi bi-gear me-1"></i>Gestión
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'tasks_completed' %}">
+                <i class="bi bi-check-circle me-1"></i>Completadas
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'logout' %}">
+                <i class="bi bi-box-arrow-right me-1"></i>Salir
+              </a>
+            </li>
+
+          <!-- Menú FUNCIONARIO DE CAMPO -->
+          {% elif user|has_group:'FUNCIONARIO_CAMPO' %}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'mis_visitas' %}">
+                <i class="bi bi-map me-1"></i>Mis Visitas
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'logout' %}">
+                <i class="bi bi-box-arrow-right me-1"></i>Salir
+              </a>
+            </li>
+
+          <!-- Menú CONTRIBUYENTE -->
+          {% else %}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'tasks' %}">
+                <i class="bi bi-folder me-1"></i>Procesos
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'tasks_completed' %}">
+                <i class="bi bi-check-circle me-1"></i>Completadas
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'logout' %}">
+                <i class="bi bi-box-arrow-right me-1"></i>Salir
+              </a>
+            </li>
+          {% endif %}
+
+        {% else %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'signup' %}">
+              <i class="bi bi-person-plus me-1"></i>Registrarse
+            </a>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'signin' %}">
+              <i class="bi bi-box-arrow-in-right me-1"></i>Iniciar Sesión
+            </a>
+          </li>
+        {% endif %}
+
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- Contenido de cada página -->
+<div class="fade-in">
+{% block content %}
+{% endblock %}
+</div>
+
+<!-- Modal previsualización PDF -->
+<div class="modal fade" id="pdfPreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered" style="max-width:90vw;">
+    <div class="modal-content">
+      <div class="modal-header py-2" style="background:var(--verde);color:#fff;">
+        <h6 class="modal-title mb-0"><i class="bi bi-file-pdf text-danger me-2" style="color:#fff !important;"></i>Vista previa del documento</h6>
+        <div class="ms-auto d-flex align-items-center gap-2">
+          <a id="pdfDownloadBtn" href="#" class="btn btn-sm btn-light">
+            <i class="bi bi-download me-1"></i>Descargar PDF
+          </a>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+      </div>
+      <div class="modal-body p-0" style="height:82vh;">
+        <iframe id="pdfPreviewFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Script global para animaciones y loading -->
+<script>
+// Función para previsualizar PDF en modal
+function previewPDF(url) {
+    const frame = document.getElementById('pdfPreviewFrame');
+    const dlBtn = document.getElementById('pdfDownloadBtn');
+    frame.src = url + (url.includes('?') ? '&' : '?') + 'inline=1';
+    dlBtn.href = url;
+    const modal = new bootstrap.Modal(document.getElementById('pdfPreviewModal'));
+    modal.show();
+}
+document.getElementById('pdfPreviewModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('pdfPreviewFrame').src = '';
+});
+
+// Función para mostrar el overlay de carga
+function showLoading(text = 'Cargando...') {
+    const overlay = document.getElementById('loadingOverlay');
+    const loadingText = overlay.querySelector('.loading-text');
+    loadingText.textContent = text;
+    overlay.classList.add('active');
+}
+
+// Función para ocultar el overlay de carga
+function hideLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    overlay.classList.remove('active');
+}
+
+// Función para mostrar toast
+function showToast(title, message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'custom-toast';
+    toast.innerHTML = `
+        <div class="toast-icon ${type}">
+            <i class="bi bi-${type === 'success' ? 'check-lg' : 'info-circle'}"></i>
+        </div>
+        <div class="toast-content">
+            <h6>${title}</h6>
+            <p>${message}</p>
+        </div>
+    `;
+    container.appendChild(toast);
+
+    // Auto-remove después de 4 segundos
+    setTimeout(() => {
+        toast.style.animation = 'slideInRight 0.3s ease-out reverse';
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+// Agregar loading a formularios de login/signup
+document.addEventListener('DOMContentLoaded', function() {
+    // Formularios que deben mostrar loading
+    const forms = document.querySelectorAll('form[data-loading="true"]');
+
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const loadingText = form.getAttribute('data-loading-text') || 'Procesando...';
+
+            // Agregar clase de loading al botón
+            if (submitBtn) {
+                submitBtn.classList.add('btn-loading');
+                const btnText = submitBtn.querySelector('.btn-text');
+                if (btnText) {
+                    btnText.style.visibility = 'hidden';
+                }
+            }
+
+            // Mostrar overlay
+            showLoading(loadingText);
+        });
+    });
+});
+</script>
+
+{% block extra_js %}{% endblock %}
+
+</body>
+</html>

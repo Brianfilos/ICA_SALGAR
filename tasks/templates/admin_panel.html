@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-4"><i class="bi bi-gear-fill"></i> Panel de Administración</h2>
+
+  <div class="row g-4">
+    <!-- Gestión de Usuarios -->
+    <div class="col-md-6 col-lg-4">
+      <div class="card h-100 shadow-sm border-0">
+        <div class="card-body text-center">
+          <div class="display-4 text-primary mb-3">
+            <i class="bi bi-people-fill"></i>
+          </div>
+          <h5 class="card-title">Gestión de Usuarios</h5>
+          <p class="card-text text-muted">Administra contribuyentes y asigna permisos de acceso a procesos.</p>
+          <a href="{% url 'admin_usuarios' %}" class="btn btn-primary">
+            <i class="bi bi-arrow-right"></i> Gestionar
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Configuración de PDFs -->
+    <div class="col-md-6 col-lg-4">
+      <div class="card h-100 shadow-sm border-0">
+        <div class="card-body text-center">
+          <div class="display-4 text-danger mb-3">
+            <i class="bi bi-file-earmark-pdf-fill"></i>
+          </div>
+          <h5 class="card-title">Configuración de PDFs</h5>
+          <p class="card-text text-muted">Personaliza logos, colores y textos de los documentos generados.</p>
+          <a href="{% url 'admin_config_pdf' %}" class="btn btn-danger">
+            <i class="bi bi-arrow-right"></i> Configurar
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reportería -->
+    <div class="col-md-6 col-lg-4">
+      <div class="card h-100 shadow-sm border-0">
+        <div class="card-body text-center">
+          <div class="display-4 text-success mb-3">
+            <i class="bi bi-graph-up-arrow"></i>
+          </div>
+          <h5 class="card-title">Reportes y Estadísticas</h5>
+          <p class="card-text text-muted">Consulta reportes de declaraciones, filtros avanzados y exportación.</p>
+          <a href="{% url 'admin_reportes' %}" class="btn btn-success">
+            <i class="bi bi-arrow-right"></i> Ver Reportes
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Procesos Completados -->
+    <div class="col-md-6 col-lg-4">
+      <div class="card h-100 shadow-sm border-0">
+        <div class="card-body text-center">
+          <div class="display-4 text-info mb-3">
+            <i class="bi bi-check-circle-fill"></i>
+          </div>
+          <h5 class="card-title">Procesos Completados</h5>
+          <p class="card-text text-muted">Consulta todos los RIT e ICA completados por los contribuyentes.</p>
+          <a href="{% url 'tasks_completed' %}" class="btn btn-info">
+            <i class="bi bi-arrow-right"></i> Ver Procesos
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Django -->
+    <div class="col-md-6 col-lg-4">
+      <div class="card h-100 shadow-sm border-0">
+        <div class="card-body text-center">
+          <div class="display-4 text-secondary mb-3">
+            <i class="bi bi-database-fill-gear"></i>
+          </div>
+          <h5 class="card-title">Admin Django</h5>
+          <p class="card-text text-muted">Accede al panel administrativo de Django para gestión avanzada.</p>
+          <a href="{% url 'admin:index' %}" class="btn btn-secondary" target="_blank">
+            <i class="bi bi-box-arrow-up-right"></i> Abrir Admin
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

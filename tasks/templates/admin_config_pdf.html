@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-file-earmark-pdf-fill text-danger"></i> Configuracion de PDFs</h2>
+    <a href="{% url 'admin_panel' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Volver
+    </a>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <div class="row">
+      <!-- Columna izquierda: Logos y Entidad -->
+      <div class="col-lg-6">
+        <!-- Logos -->
+        <div class="card mb-4 shadow-sm">
+          <div class="card-header bg-dark text-white">
+            <i class="bi bi-image"></i> Logos del Encabezado
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">Logo Izquierdo (Escudo)</label>
+                {{ form.logo_izquierdo }}
+                {% if config.logo_izquierdo %}
+                  <div class="mt-2">
+                    <img src="{{ config.logo_izquierdo.url }}" alt="Logo actual" class="img-thumbnail" style="max-height: 80px;">
+                  </div>
+                {% endif %}
+                <small class="text-muted">{{ form.logo_izquierdo.help_text }}</small>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">Logo Derecho (Institucional)</label>
+                {{ form.logo_derecho }}
+                {% if config.logo_derecho %}
+                  <div class="mt-2">
+                    <img src="{{ config.logo_derecho.url }}" alt="Logo actual" class="img-thumbnail" style="max-height: 80px;">
+                  </div>
+                {% endif %}
+                <small class="text-muted">{{ form.logo_derecho.help_text }}</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Informacion de la Entidad -->
+        <div class="card mb-4 shadow-sm">
+          <div class="card-header bg-primary text-white">
+            <i class="bi bi-building"></i> Informacion de la Entidad
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label fw-bold">Nombre de configuracion</label>
+              {{ form.nombre }}
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">Nombre de la Entidad</label>
+              {{ form.nombre_entidad }}
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">Nombre del Municipio</label>
+              {{ form.nombre_municipio }}
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">Slogan o Subtitulo</label>
+              {{ form.slogan }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Datos de Contacto -->
+        <div class="card mb-4 shadow-sm">
+          <div class="card-header bg-secondary text-white">
+            <i class="bi bi-telephone"></i> Datos de Contacto (opcionales)
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label">Direccion</label>
+              {{ form.direccion_entidad }}
+            </div>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Telefono</label>
+                {{ form.telefono_entidad }}
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Email</label>
+                {{ form.email_entidad }}
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Sitio Web</label>
+              {{ form.sitio_web }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Columna derecha: Colores e Instructivo -->
+      <div class="col-lg-6">
+        <!-- Colores -->
+        <div class="card mb-4 shadow-sm">
+          <div class="card-header bg-info text-white">
+            <i class="bi bi-palette"></i> Colores del PDF
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-6 col-md-3 mb-3 text-center">
+                <label class="form-label d-block fw-bold">Primario</label>
+                {{ form.color_primario }}
+                <small class="text-muted d-block mt-1">Titulos</small>
+              </div>
+              <div class="col-6 col-md-3 mb-3 text-center">
+                <label class="form-label d-block fw-bold">Secundario</label>
+                {{ form.color_secundario }}
+                <small class="text-muted d-block mt-1">Secciones</small>
+              </div>
+              <div class="col-6 col-md-3 mb-3 text-center">
+                <label class="form-label d-block fw-bold">Radicado</label>
+                {{ form.color_radicado }}
+                <small class="text-muted d-block mt-1">Caja radicado</small>
+              </div>
+              <div class="col-6 col-md-3 mb-3 text-center">
+                <label class="form-label d-block fw-bold">Exito</label>
+                {{ form.color_exito }}
+                <small class="text-muted d-block mt-1">Total a pagar</small>
+              </div>
+            </div>
+
+            <!-- Vista previa de colores -->
+            <div class="mt-3 p-3 border rounded" id="preview-colores">
+              <h6 class="mb-2">Vista previa:</h6>
+              <div class="d-flex gap-2 flex-wrap">
+                <span class="badge" id="preview-primario" style="background-color: {{ config.color_primario|default:'#1a5276' }}">Titulo</span>
+                <span class="badge" id="preview-secundario" style="background-color: {{ config.color_secundario|default:'#2c3e50' }}">Seccion</span>
+                <span class="badge" id="preview-radicado" style="background-color: {{ config.color_radicado|default:'#c0392b' }}">Radicado</span>
+                <span class="badge" id="preview-exito" style="background-color: {{ config.color_exito|default:'#27ae60' }}">Total</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Instructivo -->
+        <div class="card mb-4 shadow-sm">
+          <div class="card-header bg-warning">
+            <i class="bi bi-info-circle"></i> Instructivo del PDF
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <div class="form-check form-switch">
+                {{ form.mostrar_instructivo }}
+                <label class="form-check-label" for="id_mostrar_instructivo">
+                  Mostrar instructivo en los PDFs
+                </label>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">Texto del Instructivo</label>
+              {{ form.texto_instructivo }}
+              <small class="text-muted">Escribe una instruccion por linea.</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pie de Pagina -->
+        <div class="card mb-4 shadow-sm">
+          <div class="card-header bg-light">
+            <i class="bi bi-card-text"></i> Pie de Pagina
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label fw-bold">Texto adicional del pie</label>
+              {{ form.texto_pie_pagina }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones -->
+    <div class="d-flex gap-2 justify-content-end mt-3">
+      <a href="{% url 'admin_panel' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-x-lg"></i> Cancelar
+      </a>
+      <button type="submit" class="btn btn-primary btn-lg">
+        <i class="bi bi-save"></i> Guardar Configuracion
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+// Vista previa en tiempo real de colores
+document.addEventListener('DOMContentLoaded', function() {
+  const colorInputs = {
+    'id_color_primario': 'preview-primario',
+    'id_color_secundario': 'preview-secundario',
+    'id_color_radicado': 'preview-radicado',
+    'id_color_exito': 'preview-exito',
+  };
+
+  for (const [inputId, previewId] of Object.entries(colorInputs)) {
+    const input = document.getElementById(inputId);
+    const preview = document.getElementById(previewId);
+    if (input && preview) {
+      input.addEventListener('input', function() {
+        preview.style.backgroundColor = this.value;
+      });
+    }
+  }
+});
+</script>
+{% endblock %}

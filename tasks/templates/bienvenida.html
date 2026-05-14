@@ -1,0 +1,378 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="welcome-container">
+    <div class="welcome-content">
+        <!-- Animación de éxito -->
+        <div class="success-checkmark">
+            <div class="check-icon">
+                <span class="icon-line line-tip"></span>
+                <span class="icon-line line-long"></span>
+                <div class="icon-circle"></div>
+                <div class="icon-fix"></div>
+            </div>
+        </div>
+
+        <h1 class="welcome-title">
+            <span class="greeting">Bienvenido,</span>
+            <span class="username">{{ user.username }}!</span>
+        </h1>
+
+        <p class="welcome-message">
+            Tu cuenta ha sido creada exitosamente.<br>
+            Ahora completa tu Registro de Información Tributaria (RIT).
+        </p>
+
+        <div class="welcome-features">
+            <div class="feature-item">
+                <i class="bi bi-shield-check"></i>
+                <span>Cuenta verificada</span>
+            </div>
+            <div class="feature-item">
+                <i class="bi bi-person-badge"></i>
+                <span>Perfil creado</span>
+            </div>
+            <div class="feature-item">
+                <i class="bi bi-clipboard-check"></i>
+                <span>Listo para declarar</span>
+            </div>
+        </div>
+
+        {% if visita_incompleta %}
+        <div class="alert alert-warning text-start mb-3" style="border-radius:12px;font-size:.95rem;">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          <strong>Tienes una visita pendiente de completar</strong><br>
+          El funcionario <em>{{ visita_incompleta.funcionario.get_full_name|default:visita_incompleta.funcionario.username }}</em>
+          registró el establecimiento <strong>{{ visita_incompleta.nombre_establecimiento }}</strong>
+          el {{ visita_incompleta.fecha_visita|date:"d M Y" }}.
+          Por favor completa tu RIT para finalizar el proceso.
+        </div>
+        {% endif %}
+
+        <a href="{% url 'proceso_rit' %}" class="btn-continue" id="continueBtn">
+            <span class="btn-text">{% if visita_incompleta %}Completar RIT{% else %}Continuar al RIT{% endif %}</span>
+            <i class="bi bi-arrow-right"></i>
+        </a>
+
+        <div class="auto-redirect">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p class="redirect-text">Redirigiendo automáticamente en <span id="countdown">5</span> segundos...</p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .welcome-container {
+        min-height: calc(100vh - 70px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+    }
+
+    .welcome-content {
+        text-align: center;
+        max-width: 500px;
+        animation: fadeInUp 0.8s ease-out;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(40px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Checkmark animado */
+    .success-checkmark {
+        width: 100px;
+        height: 100px;
+        margin: 0 auto 30px;
+    }
+
+    .check-icon {
+        width: 100px;
+        height: 100px;
+        position: relative;
+        border-radius: 50%;
+        box-sizing: content-box;
+        border: 4px solid var(--verde);
+    }
+
+    .check-icon::before {
+        top: 3px;
+        left: -2px;
+        width: 30px;
+        transform-origin: 100% 50%;
+        border-radius: 100px 0 0 100px;
+    }
+
+    .check-icon::after {
+        top: 0;
+        left: 30px;
+        width: 60px;
+        transform-origin: 0 50%;
+        border-radius: 0 100px 100px 0;
+        animation: rotate-circle 4.25s ease-in;
+    }
+
+    .check-icon::before, .check-icon::after {
+        content: '';
+        height: 100px;
+        position: absolute;
+        background: #f5f7fa;
+        transform: rotate(-45deg);
+    }
+
+    .icon-line {
+        height: 5px;
+        background-color: var(--verde);
+        display: block;
+        border-radius: 2px;
+        position: absolute;
+        z-index: 10;
+    }
+
+    .icon-line.line-tip {
+        top: 46px;
+        left: 14px;
+        width: 25px;
+        transform: rotate(45deg);
+        animation: icon-line-tip 0.75s;
+    }
+
+    .icon-line.line-long {
+        top: 38px;
+        right: 8px;
+        width: 47px;
+        transform: rotate(-45deg);
+        animation: icon-line-long 0.75s;
+    }
+
+    .icon-circle {
+        top: -4px;
+        left: -4px;
+        z-index: 10;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        position: absolute;
+        box-sizing: content-box;
+        border: 4px solid rgba(0, 102, 51, 0.5);
+    }
+
+    .icon-fix {
+        top: 8px;
+        width: 5px;
+        left: 26px;
+        z-index: 1;
+        height: 85px;
+        position: absolute;
+        transform: rotate(-45deg);
+        background-color: #f5f7fa;
+    }
+
+    @keyframes rotate-circle {
+        0% { transform: rotate(-45deg); }
+        5% { transform: rotate(-45deg); }
+        12% { transform: rotate(-405deg); }
+        100% { transform: rotate(-405deg); }
+    }
+
+    @keyframes icon-line-tip {
+        0% { width: 0; left: 1px; top: 19px; }
+        54% { width: 0; left: 1px; top: 19px; }
+        70% { width: 50px; left: -8px; top: 37px; }
+        84% { width: 17px; left: 21px; top: 48px; }
+        100% { width: 25px; left: 14px; top: 46px; }
+    }
+
+    @keyframes icon-line-long {
+        0% { width: 0; right: 46px; top: 54px; }
+        65% { width: 0; right: 46px; top: 54px; }
+        84% { width: 55px; right: 0px; top: 35px; }
+        100% { width: 47px; right: 8px; top: 38px; }
+    }
+
+    /* Títulos */
+    .welcome-title {
+        margin-bottom: 20px;
+    }
+
+    .greeting {
+        display: block;
+        font-size: 1.5rem;
+        font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+        color: var(--verde-limón);
+        font-weight: bold;
+        animation: fadeIn 1s ease-out 0.3s both;
+    }
+
+    .username {
+        display: block;
+        font-size: 2.5rem;
+        font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+        color: var(--verde);
+        font-weight: bold;
+        text-transform: uppercase;
+        animation: fadeIn 1s ease-out 0.5s both;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .welcome-message {
+        font-family: Arial, sans-serif;
+        color: #000000;
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 30px;
+        animation: fadeIn 1s ease-out 0.7s both;
+    }
+
+    /* Features */
+    .welcome-features {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+        margin-bottom: 40px;
+        flex-wrap: wrap;
+        animation: fadeIn 1s ease-out 0.9s both;
+    }
+
+    .feature-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .feature-item i {
+        font-size: 2rem;
+        color: var(--verde);
+        background: rgba(0, 102, 51, 0.1);
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+    }
+
+    .feature-item span {
+        font-size: 0.9rem;
+        font-family: Arial, sans-serif;
+        color: #000000;
+        font-weight: 500;
+    }
+
+    /* Botón continuar */
+    .btn-continue {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 15px 40px;
+        background: var(--verde);
+        color: #fff;
+        border-radius: 50px;
+        font-size: 1.2rem;
+        font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+        font-weight: bold;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        animation: fadeIn 1s ease-out 1.1s both;
+        box-shadow: 0 4px 15px rgba(0, 102, 51, 0.3);
+    }
+
+    .btn-continue:hover {
+        background: var(--verde-hover);
+        color: #fff;
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0, 102, 51, 0.4);
+    }
+
+    .btn-continue i {
+        transition: transform 0.3s ease;
+    }
+
+    .btn-continue:hover i {
+        transform: translateX(5px);
+    }
+
+    /* Auto redirect */
+    .auto-redirect {
+        margin-top: 40px;
+        animation: fadeIn 1s ease-out 1.3s both;
+    }
+
+    .progress-bar {
+        width: 200px;
+        height: 4px;
+        background: #e0e0e0;
+        border-radius: 2px;
+        margin: 0 auto 15px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: var(--verde);
+        width: 0%;
+        transition: width 1s linear;
+    }
+
+    .redirect-text {
+        font-size: 0.9rem;
+        font-family: Arial, sans-serif;
+        color: #000000;
+    }
+
+    #countdown {
+        font-weight: 700;
+        color: var(--verde);
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let seconds = 5;
+    const countdownEl = document.getElementById('countdown');
+    const progressFill = document.getElementById('progressFill');
+    const continueBtn = document.getElementById('continueBtn');
+
+    // Animación de progreso
+    progressFill.style.width = '0%';
+
+    const interval = setInterval(() => {
+        seconds--;
+        countdownEl.textContent = seconds;
+        progressFill.style.width = ((5 - seconds) / 5 * 100) + '%';
+
+        if (seconds <= 0) {
+            clearInterval(interval);
+            // Mostrar loading y redirigir
+            showLoading('Cargando RIT...');
+            setTimeout(() => {
+                window.location.href = continueBtn.href;
+            }, 500);
+        }
+    }, 1000);
+
+    // Si hace clic en el botón, cancelar countdown
+    continueBtn.addEventListener('click', function(e) {
+        clearInterval(interval);
+        showLoading('Cargando RIT...');
+    });
+});
+</script>
+{% endblock %}

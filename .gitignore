@@ -1,0 +1,32 @@
+# Variables de entorno - NUNCA subir al repositorio
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Django
+db.sqlite3
+staticfiles/
+media/
+
+# Entorno virtual
+venv/
+env/
+.venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archivos temporales de Office
+~$*

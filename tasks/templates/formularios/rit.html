@@ -1,0 +1,947 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <h3 class="text-center mb-1">REGISTRO DE INFORMACIÓN TRIBUTARIA</h3>
+  <p class="text-center text-muted mb-4">Municipio de Salgar — Secretaría de Hacienda</p>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Mostrar errores de validación -->
+  {% if form.errors or representantes_formset.errors or establecimientos_formset.errors or actividades_formset.errors %}
+    <div class="alert alert-danger">
+      <h6 class="fw-bold">Por favor corrija los siguientes errores:</h6>
+      {% if form.non_field_errors %}
+        <ul class="mb-1">
+          {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      {% if form.errors %}
+        <ul class="mb-1">
+          {% for field, errors in form.errors.items %}
+            {% if field != '__all__' %}
+              <li><strong>{{ field }}:</strong> {{ errors|join:", " }}</li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+      {% endif %}
+      {% if actividades_formset.non_form_errors %}
+        <ul class="mb-1">
+          {% for error in actividades_formset.non_form_errors %}
+            <li><strong>Actividades:</strong> {{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <!-- Banner informativo para Actualización/Cancelación -->
+  {% if opcion_uso == 'ACTUALIZACION' and rit_activo %}
+    <div class="alert alert-info d-flex align-items-center mb-3">
+      <i class="bi bi-info-circle-fill me-2 fs-4"></i>
+      <div>
+        <strong>Actualización de RIT</strong><br>
+        Estás actualizando el RIT con radicado <strong>{{ rit_activo.radicado }}</strong>.
+        Los cambios generarán un nuevo registro con nuevo radicado.
+      </div>
+    </div>
+  {% elif opcion_uso == 'CANCELACION' and rit_activo %}
+    <div class="alert alert-warning d-flex align-items-center mb-3">
+      <i class="bi bi-exclamation-triangle-fill me-2 fs-4"></i>
+      <div>
+        <strong>Cancelación de RIT</strong><br>
+        Estás cancelando el RIT con radicado <strong>{{ rit_activo.radicado }}</strong>.
+        Después de cancelar, podrás realizar una nueva inscripción si lo necesitas.
+      </div>
+    </div>
+  {% endif %}
+
+  {% if visita_incompleta %}
+  <div class="alert alert-warning d-flex align-items-start gap-2 mb-3">
+    <i class="bi bi-person-lines-fill fs-4 mt-1" style="color:#E65100;"></i>
+    <div>
+      <strong>Visita de campo pendiente</strong><br>
+      El funcionario <em>{{ visita_incompleta.funcionario.get_full_name|default:visita_incompleta.funcionario.username }}</em>
+      visitó el establecimiento <strong>{{ visita_incompleta.nombre_establecimiento }}</strong>
+      el {{ visita_incompleta.fecha_visita|date:"d M Y" }}. Los datos han sido precargados.
+      Por favor revisa y completa el formulario.
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" id="rit-form" action="{% url 'proceso_rit' %}?opcion={{ opcion_uso }}">
+    {% csrf_token %}
+
+    <!-- Campo opcion_uso oculto (JS lo lee para cancelación) -->
+    {{ form.opcion_uso.as_hidden }}
+
+    <!-- ========================= -->
+    <!-- SECCIÓN A: CLASIFICACIÓN DEL OBLIGADO -->
+    <!-- ========================= -->
+    <div class="card mb-3">
+      <div class="card-header bg-primary text-white">
+        <strong>A. DATOS DE REGISTRO Y CLASIFICACIÓN DEL OBLIGADO</strong>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <!-- 1. Fecha -->
+          <div class="col-md-3">
+            <label class="form-label">1. Fecha</label>
+            <input type="text" class="form-control" readonly
+                   value="{% if rit_activo and opcion_uso != 'INSCRIPCION' %}{{ rit_activo.fecha|date:'d/m/Y' }}{% else %}{% now 'd/m/Y' %}{% endif %}">
+          </div>
+
+          <!-- 2. Tipo de contribuyente -->
+          <div class="col-md-3">
+            <label class="form-label">2. Tipo de contribuyente</label>
+            {{ form.clase_contribuyente }}
+            {% if form.clase_contribuyente.errors %}
+              <div class="text-danger small">{{ form.clase_contribuyente.errors }}</div>
+            {% endif %}
+          </div>
+
+          <!-- 3. Obligaciones -->
+          <div class="col-md-3">
+            <label class="form-label d-block">3. Obligaciones</label>
+            <div class="form-check">
+              {{ form.es_retenedor_ica }}
+              <label class="form-check-label" for="id_es_retenedor_ica">Agente de Retención ICA</label>
+            </div>
+            <div class="form-check">
+              {{ form.es_autorretenedor_ica }}
+              <label class="form-check-label" for="id_es_autorretenedor_ica">Autorretenedor ICA</label>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- SECCIÓN B: CANCELACIÓN (oculta si es Inscripción) -->
+    <!-- ========================= -->
+    <div class="card mb-3" id="seccion-cancelacion" style="display: none;">
+      <div class="card-header bg-danger text-white">
+        <strong>INFORMACIÓN DE CANCELACIÓN</strong>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Tipo de cancelación *</label>
+            {{ form.tipo_cancelacion }}
+            {% if form.tipo_cancelacion.errors %}
+              <div class="text-danger small">{{ form.tipo_cancelacion.errors }}</div>
+            {% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Motivo de cancelación *</label>
+            {{ form.motivo_cancelacion }}
+            {% if form.motivo_cancelacion.errors %}
+              <div class="text-danger small">{{ form.motivo_cancelacion.errors }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- SECCIÓN B: DATOS DEL CONTRIBUYENTE O RESPONSABLE -->
+    <!-- ========================= -->
+    <div class="card mb-3">
+      <div class="card-header bg-dark text-white">
+        <strong>B. DATOS DEL CONTRIBUYENTE O RESPONSABLE</strong>
+      </div>
+      <div class="card-body">
+
+        <!-- Fila 0: Tipo de persona (primero) -->
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">11. Tipo de persona</label>
+            {{ form.tipo_persona }}
+          </div>
+
+          <div class="col-md-4" id="bloque-juridica" style="display:none;">
+            <label class="form-label">Tipo jurídica</label>
+            {{ form.tipo_juridica }}
+          </div>
+
+          <div class="col-md-4" id="bloque-otro" style="display:none;">
+            <label class="form-label">Especifique el tipo jurídico</label>
+            {{ form.otro_tipo_juridica }}
+          </div>
+        </div>
+
+        <!-- Fila 1: Tipo documento + No. documento + DV -->
+        <div class="row g-3 mt-1">
+          <div class="col-md-3">
+            <label class="form-label">5. Tipo de documento</label>
+            {{ form.tipo_documento }}
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">No. documento</label>
+            {{ form.numero_documento }}
+          </div>
+
+          <!-- DV solo para NIT -->
+          <div class="col-md-1" id="dv_wrap" style="display:none;">
+            <label class="form-label">DV</label>
+            {{ form.dv }}
+          </div>
+        </div>
+
+        <!-- "Cuál documento" solo si tipo_documento=OTRO -->
+        <div class="row g-3 mt-1" id="cual_documento_wrap" style="display:none;">
+          <div class="col-md-6">
+            <label class="form-label">Especifique el tipo de documento</label>
+            {{ form.cual_documento }}
+          </div>
+        </div>
+
+        <!-- Fila 2: Nombre / Razón Social -->
+        <div class="row g-3 mt-1">
+          <div class="col-md-12">
+            <label class="form-label">6. NOMBRE COMPLETO / RAZÓN SOCIAL</label>
+            {{ form.nombre_razon_social }}
+          </div>
+        </div>
+
+        <!-- Fila 3: 7. Domicilio principal (Dirección + Municipio + Departamento) -->
+        <div class="row g-3 mt-1">
+          <div class="col-md-6">
+            <label class="form-label">7. Domicilio principal</label>
+            {% if not perfil %}
+            <!-- Constructor de dirección estilo IGAC -->
+            <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+              <select id="v_tipo" class="form-select form-select-sm" style="width:90px" title="Tipo de vía">
+                <option value="CLL">CLL</option>
+                <option value="CRR">CRR</option>
+                <option value="DIAG">DIAG</option>
+                <option value="TRANS">TRANS</option>
+                <option value="AV">AV</option>
+              </select>
+              <input type="text" id="v_num" class="form-control form-control-sm addr-input" placeholder="Nro." style="width:60px" title="Número de vía">
+              <select id="v_letra" class="form-select form-select-sm" style="width:70px" title="Letra vía">
+                <option value="">Letra</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+              </select>
+              <span class="fw-bold text-primary px-1">CON</span>
+              <select id="g_tipo" class="form-select form-select-sm" style="width:90px" title="Tipo vía generadora">
+                <option value="CLL">CLL</option>
+                <option value="CRR">CRR</option>
+                <option value="DIAG">DIAG</option>
+                <option value="TRANS">TRANS</option>
+                <option value="AV">AV</option>
+              </select>
+              <input type="text" id="g_num" class="form-control form-control-sm addr-input" placeholder="Nro." style="width:60px" title="Número generador">
+              <select id="g_letra" class="form-select form-select-sm" style="width:70px" title="Letra generador">
+                <option value="">Letra</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+              </select>
+              <span class="fw-bold text-secondary px-1">-</span>
+              <input type="text" id="p_num" class="form-control form-control-sm addr-input" placeholder="Nro." style="width:60px" title="Número del predio">
+            </div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <select id="c_tipo" class="form-select form-select-sm" style="width:130px" title="Complemento">
+                <option value="">Complemento</option>
+                <option value="INT">Interior</option>
+                <option value="APTO">Apto.</option>
+                <option value="LOCAL">Local</option>
+                <option value="LOTE">Lote</option>
+                <option value="BLOQUE">Bloque</option>
+                <option value="PISO">Piso</option>
+              </select>
+              <input type="text" id="c_num" class="form-control form-control-sm addr-input" placeholder="Nro." style="width:80px" title="Número complemento">
+            </div>
+            <!-- Resultado concatenado visible -->
+            <input type="text" id="addr_preview" class="form-control form-control-sm bg-light"
+                   readonly placeholder="Dirección generada automáticamente..."
+                   style="font-weight:500; color:#212529;">
+            <!-- Campo real oculto — JS lo llena -->
+            <input type="hidden" name="direccion_notificacion" id="id_direccion_notificacion">
+            {% else %}
+            {{ form.direccion_notificacion }}
+            {% endif %}
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Municipio</label>
+            {{ form.municipio_notificacion }}
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Departamento</label>
+            <input type="text" class="form-control" id="departamento_preview" readonly
+                   value="{% if perfil and perfil.departamento_notificacion %}{{ perfil.departamento_notificacion.nombre }}{% endif %}">
+          </div>
+        </div>
+
+        <!-- Fila 4: Celular + Correo + # Establecimientos -->
+        <div class="row g-3 mt-1">
+          <div class="col-md-3">
+            <label class="form-label">8. Celular</label>
+            {{ form.telefono }}
+          </div>
+
+          <div class="col-md-5">
+            <label class="form-label">9. Correo electrónico</label>
+            {{ form.correo_electronico }}
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">10. No. establecimientos</label>
+            {{ form.numero_establecimientos }}
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- SECCIÓN C: REPRESENTACIÓN LEGAL -->
+    <!-- ========================= -->
+    <div class="card mb-3">
+      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <strong>C. REPRESENTACIÓN LEGAL</strong>
+        <button type="button" class="btn btn-sm btn-light" id="add-representante">
+          + Agregar
+        </button>
+      </div>
+      <div class="card-body">
+        {{ representantes_formset.management_form }}
+        <div id="representantes-container">
+          {% for rep_form in representantes_formset %}
+            <div class="representante-row border rounded p-3 mb-2 {% if rep_form.errors %}border-danger{% endif %}">
+              <div class="row g-2 align-items-end">
+                <div class="col-md-2">
+                  <label class="form-label small">Tipo</label>
+                  {{ rep_form.tipo_representante }}
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small">Nombre completo</label>
+                  {{ rep_form.nombre }}
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small">Tipo documento</label>
+                  {{ rep_form.tipo_documento }}
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small">No. documento</label>
+                  {{ rep_form.numero_documento }}
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small">Correo electrónico</label>
+                  {{ rep_form.correo_electronico }}
+                </div>
+                <div class="col-md-1 text-end">
+                  <button type="button" class="btn btn-sm btn-outline-danger remove-representante">
+                    <i class="bi bi-trash"></i> X
+                  </button>
+                </div>
+                {{ rep_form.orden }}
+                {{ rep_form.id }}
+                {% if rep_form.instance.pk %}{{ rep_form.DELETE }}{% endif %}
+              </div>
+              {% if rep_form.errors %}
+                <div class="text-danger small mt-1">{{ rep_form.errors }}</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <p class="text-muted small mb-0 mt-2">
+          <i class="bi bi-info-circle"></i> Agregue el representante legal o representante suplente según aplique.
+        </p>
+      </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- PREGUNTA: ¿TIENE ESTABLECIMIENTOS? -->
+    <!-- ========================= -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-12">
+            <label class="form-label fw-semibold">¿Tiene establecimientos?</label>
+            <div class="form-check form-check-inline">
+              {{ form.tiene_establecimientos }}
+              <input class="form-check-input" type="radio" name="tiene_establecimientos_radio" id="tiene_establecimientos_si" value="true" {% if form.tiene_establecimientos.value == True or form.tiene_establecimientos.value == None %}checked{% endif %}>
+              <label class="form-check-label" for="tiene_establecimientos_si">Sí</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="tiene_establecimientos_radio" id="tiene_establecimientos_no" value="false" {% if form.tiene_establecimientos.value == False %}checked{% endif %}>
+              <label class="form-check-label" for="tiene_establecimientos_no">No</label>
+            </div>
+            {% if form.tiene_establecimientos.errors %}
+              <div class="text-danger small mt-1">{{ form.tiene_establecimientos.errors }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- SECCIÓN D: ESTABLECIMIENTOS -->
+    <!-- ========================= -->
+    <div class="card mb-3" id="seccion-establecimientos">
+      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <strong>D. ESTABLECIMIENTOS DE COMERCIO, SUC, AGENCIA EN SEGOVIA</strong>
+        <button type="button" class="btn btn-sm btn-light" id="add-establecimiento">
+          + Agregar
+        </button>
+      </div>
+      <div class="card-body">
+        {{ establecimientos_formset.management_form }}
+        <div id="establecimientos-container">
+          {% for est_form in establecimientos_formset %}
+            <div class="establecimiento-row border rounded p-3 mb-2 {% if est_form.errors %}border-danger{% endif %}">
+              <div class="row g-2">
+                <div class="col-md-3">
+                  <label class="form-label small">Nombre del establecimiento</label>
+                  {{ est_form.nombre }}
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small">Dirección</label>
+                  {{ est_form.direccion }}
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small">Teléfono</label>
+                  {{ est_form.telefono }}
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small">Fecha inicio actividades</label>
+                  {{ est_form.fecha_inicio_actividades }}
+                </div>
+                <div class="col-md-1">
+                  <label class="form-label small d-block">Avisos/Tableros</label>
+                  {{ est_form.tiene_avisos_tableros }}
+                </div>
+                <div class="col-md-1 text-end">
+                  <button type="button" class="btn btn-sm btn-outline-danger remove-establecimiento">
+                    <i class="bi bi-trash"></i> X
+                  </button>
+                </div>
+                {{ est_form.orden }}
+                {{ est_form.id }}
+                {% if est_form.instance.pk %}{{ est_form.DELETE }}{% endif %}
+                <!-- Campo fecha_cancelacion oculto, solo visible en cancelación -->
+                <div class="col-md-2 fecha-cancelacion-field" style="display: none;">
+                  <label class="form-label small">Fecha cancelación</label>
+                  {{ est_form.fecha_cancelacion }}
+                </div>
+              </div>
+              {% if est_form.errors %}
+                <div class="text-danger small mt-1">{{ est_form.errors }}</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- SECCIÓN E: ACTIVIDADES ECONÓMICAS -->
+    <!-- ========================= -->
+    <div class="card mb-3">
+      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <strong>E. ACTIVIDADES ECONÓMICAS</strong>
+        <button type="button" class="btn btn-sm btn-light" id="add-actividad">
+          + Agregar
+        </button>
+      </div>
+      <div class="card-body">
+        {{ actividades_formset.management_form }}
+        <table class="table table-sm table-bordered" id="actividades-table">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 5%;">#</th>
+              <th style="width: 65%;">Actividad Económica</th>
+              <th style="width: 25%;">Base Gravable Mensual</th>
+              <th style="width: 5%;"></th>
+            </tr>
+          </thead>
+          <tbody id="actividades-container">
+            {% for act_form in actividades_formset %}
+              <tr class="actividad-row {% if act_form.errors %}table-danger{% endif %}">
+                <td class="actividad-numero align-middle text-center">{{ forloop.counter }}</td>
+                <td>
+                  {{ act_form.actividad }}
+                  {% if act_form.actividad.errors %}
+                    <div class="text-danger small">{{ act_form.actividad.errors }}</div>
+                  {% endif %}
+                </td>
+                <td>
+                  {{ act_form.base_gravable_mensual }}
+                  {% if act_form.base_gravable_mensual.errors %}
+                    <div class="text-danger small">{{ act_form.base_gravable_mensual.errors }}</div>
+                  {% endif %}
+                </td>
+                <td class="text-center align-middle">
+                  <button type="button" class="btn btn-sm btn-outline-danger remove-actividad">X</button>
+                  {{ act_form.orden }}
+                  {{ act_form.id }}
+                  {% if act_form.instance.pk %}{{ act_form.DELETE }}{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% if actividades_formset.non_form_errors %}
+          <div class="alert alert-danger">{{ actividades_formset.non_form_errors }}</div>
+        {% endif %}
+        <p class="text-muted small mb-0">
+          <i class="bi bi-info-circle"></i> Mínimo 1, máximo 15 actividades económicas.
+        </p>
+      </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- SECCIÓN F: FIRMAS -->
+    <!-- ========================= -->
+    <div class="card mb-3">
+      <div class="card-header bg-dark text-white">
+        <strong>F. FIRMAS</strong>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info mb-0 d-flex align-items-start gap-3">
+          <div style="font-size:2rem; line-height:1;">✉️</div>
+          <div>
+            <strong>Firma Electrónica mediante Código OTP</strong><br>
+            Al hacer clic en <strong>Crear</strong>, se enviará un código de verificación de 6 dígitos
+            a su correo electrónico registrado. Deberá ingresar ese código para completar la
+            <strong>firma electrónica simple</strong> del Registro RIT, conforme a la
+            Ley 527 de 1999 (Colombia). El código tendrá una vigencia de <strong>15 minutos</strong>.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- BOTÓN CREAR -->
+    <!-- ========================= -->
+    <div class="d-grid gap-2 mb-4">
+      <button type="submit" class="btn btn-success btn-lg" id="btn-crear">
+        <span class="btn-text">Crear</span>
+      </button>
+    </div>
+
+    <p class="text-center">
+      <a href="{% url 'tasks' %}" class="btn btn-outline-secondary">
+        Volver al Panel de Procesos
+      </a>
+    </p>
+
+  </form>
+
+</div>
+
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+
+<!-- jQuery + Select2 JS -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+$(document).ready(function() {
+
+  // =====================
+  // Mapeo municipio -> departamento (desde el backend)
+  // =====================
+  const municipios = {{ municipios_json|safe }};
+
+  // =====================
+  // Select2 para municipio y actividades
+  // =====================
+  function initSelect2() {
+    $('#id_municipio_notificacion').select2({
+      theme: 'bootstrap-5',
+      placeholder: 'Seleccione un municipio',
+      allowClear: true,
+      width: '100%'
+    });
+
+    $('.actividad-select').select2({
+      theme: 'bootstrap-5',
+      placeholder: 'Seleccione una actividad',
+      allowClear: true,
+      width: '100%'
+    });
+  }
+  initSelect2();
+
+  // =====================
+  // Actualizar departamento al cambiar municipio
+  // =====================
+  $('#id_municipio_notificacion').on('change', function() {
+    const val = $(this).val();
+    const depto = municipios[val] || '';
+    $('#departamento_preview').val(depto);
+  });
+
+  if (!$('#departamento_preview').val()) {
+    $('#id_municipio_notificacion').trigger('change');
+  }
+
+  // =====================
+  // Deshabilitar opción ICA Simplificado (solo visualización)
+  // =====================
+  $('#id_clase_contribuyente option[value="ICA_SIMPLIFICADO"]').prop('disabled', true);
+
+  // =====================
+  // NO_SUJETO → Agente de Retención ICA automático
+  // =====================
+  function toggleNoSujeto() {
+    const tipo = $('#id_clase_contribuyente').val();
+    if (tipo === 'NO_SUJETO') {
+      $('#id_es_retenedor_ica').prop('checked', true).prop('disabled', true);
+    } else {
+      $('#id_es_retenedor_ica').prop('disabled', false);
+    }
+  }
+  $('#id_clase_contribuyente').on('change', toggleNoSujeto);
+  toggleNoSujeto();
+
+  // =====================
+  // Mostrar/ocultar sección CANCELACIÓN
+  // =====================
+  function toggleSeccionCancelacion() {
+    const opcion = $('#id_opcion_uso').val();
+    if (opcion === 'CANCELACION') {
+      $('#seccion-cancelacion').show();
+      $('.fecha-cancelacion-field').show();
+    } else {
+      $('#seccion-cancelacion').hide();
+      $('.fecha-cancelacion-field').hide();
+    }
+  }
+
+  $('#id_opcion_uso').on('change', toggleSeccionCancelacion);
+  toggleSeccionCancelacion();
+
+  // =====================
+  // Mostrar/ocultar sección D (Establecimientos)
+  // =====================
+
+  // Ocultar el campo checkbox original de Django
+  $('#id_tiene_establecimientos').hide();
+
+  function toggleSeccionEstablecimientos() {
+    const tieneEstablecimientos = $('input[name="tiene_establecimientos_radio"]:checked').val();
+
+    if (tieneEstablecimientos === 'true') {
+      $('#id_tiene_establecimientos').prop('checked', true);
+      $('#seccion-establecimientos').show();
+    } else {
+      $('#id_tiene_establecimientos').prop('checked', false);
+      $('#seccion-establecimientos').hide();
+    }
+  }
+
+  $('input[name="tiene_establecimientos_radio"]').on('change', toggleSeccionEstablecimientos);
+  toggleSeccionEstablecimientos();
+
+  // =====================
+  // DV solo si NIT
+  // =====================
+  function toggleDV() {
+    const tipoDoc = $('#id_tipo_documento').val();
+    if (tipoDoc === 'NIT') {
+      $('#dv_wrap').show();
+    } else {
+      $('#dv_wrap').hide();
+      $('#id_dv').val('');
+    }
+  }
+
+  $('#id_tipo_documento').on('change', toggleDV);
+  toggleDV();
+
+  // =====================
+  // Cálculo automático de DV para NIT
+  // =====================
+  function calcularDV(nit) {
+    nit = nit.replace(/\D/g, '');
+    if (nit.length === 0) return '';
+
+    const primos = [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71];
+    let suma = 0;
+
+    for (let i = 0; i < nit.length; i++) {
+      suma += parseInt(nit[nit.length - 1 - i]) * primos[i];
+    }
+
+    const residuo = suma % 11;
+    if (residuo === 0) return '0';
+    if (residuo === 1) return '1';
+    return String(11 - residuo);
+  }
+
+  $('#id_numero_documento').on('input', function() {
+    const tipoDoc = $('#id_tipo_documento').val();
+    if (tipoDoc === 'NIT') {
+      const nit = $(this).val();
+      const dv = calcularDV(nit);
+      $('#id_dv').val(dv);
+    }
+  });
+
+  // =====================
+  // Cuál documento si OTRO
+  // =====================
+  function toggleCualDocumento() {
+    const tipoDoc = $('#id_tipo_documento').val();
+    if (tipoDoc === 'OTRO') {
+      $('#cual_documento_wrap').show();
+    } else {
+      $('#cual_documento_wrap').hide();
+      $('#id_cual_documento').val('');
+    }
+  }
+
+  $('#id_tipo_documento').on('change', toggleCualDocumento);
+  toggleCualDocumento();
+
+  // =====================
+  // Tipo jurídica si JURIDICA
+  // =====================
+  function toggleTipoJuridica() {
+    const tipoPers = $('#id_tipo_persona').val();
+    if (tipoPers === 'JURIDICA') {
+      $('#bloque-juridica').show();
+      if ($('#id_tipo_documento').val() !== 'NIT') {
+        $('#id_tipo_documento').val('NIT').trigger('change');
+      }
+    } else {
+      $('#bloque-juridica').hide();
+      $('#id_tipo_juridica').val('');
+      $('#bloque-otro').hide();
+      $('#id_otro_tipo_juridica').val('');
+    }
+  }
+
+  $('#id_tipo_persona').on('change', toggleTipoJuridica);
+  toggleTipoJuridica();
+
+  // =====================
+  // Otro tipo jurídico si OTRO
+  // =====================
+  function toggleOtroTipoJuridica() {
+    const tipoJur = $('#id_tipo_juridica').val();
+    if (tipoJur === 'OTRO' && $('#id_tipo_persona').val() === 'JURIDICA') {
+      $('#bloque-otro').show();
+    } else {
+      $('#bloque-otro').hide();
+      $('#id_otro_tipo_juridica').val('');
+    }
+  }
+
+  $('#id_tipo_juridica').on('change', toggleOtroTipoJuridica);
+  toggleOtroTipoJuridica();
+
+  // =====================
+  // Constructor estructurado de dirección
+  // =====================
+  // Constructor de dirección IGAC
+  function buildDireccion() {
+    const tipo   = $('#v_tipo').val()  || 'CLL';
+    const vnum   = $('#v_num').val().trim();
+    const vletra = $('#v_letra').val() || '';
+    const gtipo  = $('#g_tipo').val()  || 'CLL';
+    const gnum   = $('#g_num').val().trim();
+    const gletra = $('#g_letra').val() || '';
+    const pnum   = $('#p_num').val().trim();
+    const ctype  = $('#c_tipo').val()  || '';
+    const cnum   = $('#c_num').val().trim();
+
+    let dir = tipo;
+    if (vnum)   dir += ' ' + vnum;
+    if (vletra) dir += vletra;
+    dir += ' CON ' + gtipo;
+    if (gnum)   dir += ' ' + gnum;
+    if (gletra) dir += gletra;
+    if (pnum)   dir += ' - ' + pnum;
+    if (ctype && cnum) dir += ' ' + ctype + ' ' + cnum;
+    else if (ctype)    dir += ' ' + ctype;
+    else if (cnum)     dir += ' ' + cnum;
+
+    const result = dir.trim();
+    $('#id_direccion_notificacion').val(result);
+    $('#addr_preview').val(result);
+  }
+
+  $('#v_tipo, #v_letra, #g_tipo, #g_letra, #c_tipo').on('change', buildDireccion);
+  $('#v_num, #g_num, #p_num, #c_num').on('input', buildDireccion);
+  buildDireccion();
+
+  // =====================
+  // FORMSET DINÁMICO: Representantes
+  // =====================
+  let repTotalForms = $('#id_representantes-TOTAL_FORMS');
+
+  $('#add-representante').on('click', function() {
+    const container = $('#representantes-container');
+    const formIdx = parseInt(repTotalForms.val());
+    const newForm = container.find('.representante-row:first').clone(true);
+
+    newForm.find('input, select').each(function() {
+      const name = $(this).attr('name');
+      if (name) {
+        $(this).attr('name', name.replace(/-\d+-/, `-${formIdx}-`));
+        $(this).attr('id', $(this).attr('id').replace(/-\d+-/, `-${formIdx}-`));
+      }
+      if ($(this).is('input')) $(this).val('');
+      if ($(this).is('select')) $(this).val('');
+    });
+
+    newForm.removeClass('border-danger');
+    newForm.find('.text-danger').remove();
+    container.append(newForm);
+    repTotalForms.val(formIdx + 1);
+  });
+
+  $(document).on('click', '.remove-representante', function() {
+    const container = $('#representantes-container');
+    if (container.find('.representante-row').length > 1) {
+      $(this).closest('.representante-row').remove();
+      repTotalForms.val(container.find('.representante-row').length);
+    }
+  });
+
+  // =====================
+  // FORMSET DINÁMICO: Establecimientos
+  // =====================
+  let estTotalForms = $('#id_establecimientos-TOTAL_FORMS');
+
+  $('#add-establecimiento').on('click', function() {
+    const container = $('#establecimientos-container');
+    const formIdx = parseInt(estTotalForms.val());
+    const newForm = container.find('.establecimiento-row:first').clone(true);
+
+    newForm.find('input, select').each(function() {
+      const name = $(this).attr('name');
+      if (name) {
+        $(this).attr('name', name.replace(/-\d+-/, `-${formIdx}-`));
+        $(this).attr('id', $(this).attr('id').replace(/-\d+-/, `-${formIdx}-`));
+      }
+      if ($(this).is('input[type="text"], input[type="date"]')) $(this).val('');
+      if ($(this).is('input[type="checkbox"]')) $(this).prop('checked', false);
+      if ($(this).is('select')) $(this).val('');
+    });
+
+    newForm.removeClass('border-danger');
+    newForm.find('.text-danger').remove();
+    container.append(newForm);
+    estTotalForms.val(formIdx + 1);
+  });
+
+  $(document).on('click', '.remove-establecimiento', function() {
+    const container = $('#establecimientos-container');
+    if (container.find('.establecimiento-row').length > 1) {
+      $(this).closest('.establecimiento-row').remove();
+      estTotalForms.val(container.find('.establecimiento-row').length);
+    }
+  });
+
+  // =====================
+  // FORMSET DINÁMICO: Actividades
+  // =====================
+  let actTotalForms = $('#id_actividades-TOTAL_FORMS');
+
+  function updateActividadNumeros() {
+    $('#actividades-container .actividad-row').each(function(idx) {
+      $(this).find('.actividad-numero').text(idx + 1);
+    });
+  }
+
+  $('#add-actividad').on('click', function() {
+    const container = $('#actividades-container');
+    const formIdx = parseInt(actTotalForms.val());
+
+    if (formIdx >= 15) {
+      alert('Máximo 15 actividades permitidas.');
+      return;
+    }
+
+    // Clonar sin datos/eventos para evitar conflicto con Select2
+    const newRow = container.find('.actividad-row:first').clone(false);
+
+    // Eliminar contenedores Select2 clonados y limpiar atributos Select2
+    newRow.find('.select2-container').remove();
+    newRow.find('select').removeAttr('data-select2-id').removeAttr('aria-hidden').css('display', '');
+    newRow.find('[data-select2-id]').removeAttr('data-select2-id');
+
+    newRow.find('input, select').each(function() {
+      const name = $(this).attr('name');
+      const id   = $(this).attr('id') || '';
+      if (name) $(this).attr('name', name.replace(/-\d+-/, `-${formIdx}-`));
+      if (id)   $(this).attr('id',   id.replace(/-\d+-/, `-${formIdx}-`));
+      if ($(this).is('input'))  $(this).val('');
+      if ($(this).is('select')) $(this).val('');
+    });
+
+    newRow.removeClass('table-danger');
+    newRow.find('.text-danger').remove();
+    container.append(newRow);
+    actTotalForms.val(formIdx + 1);
+
+    newRow.find('.actividad-select').select2({
+      theme: 'bootstrap-5',
+      placeholder: 'Seleccione una actividad',
+      allowClear: true,
+      width: '100%'
+    });
+
+    updateActividadNumeros();
+  });
+
+  $(document).on('click', '.remove-actividad', function() {
+    const container = $('#actividades-container');
+    if (container.find('.actividad-row').length > 1) {
+      $(this).closest('.actividad-row').remove();
+      actTotalForms.val(container.find('.actividad-row').length);
+      updateActividadNumeros();
+    }
+  });
+
+});
+</script>
+
+<style>
+  .card-header {
+    font-weight: bold;
+  }
+  .form-label {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+  }
+  .representante-row, .establecimiento-row {
+    background-color: #f8f9fa;
+  }
+  .form-check-input {
+    margin-top: 0.3rem;
+  }
+  /* Constructor de dirección */
+  .addr-input {
+    text-align: center;
+  }
+</style>
+
+{% endblock %}

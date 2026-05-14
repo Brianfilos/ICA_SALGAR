@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+
+      <div class="card shadow">
+        <div class="card-header text-white text-center" style="background-color: var(--verde);">
+          <h5 class="mb-0">FIRMA ELECTRÓNICA — REGISTRO RIT</h5>
+        </div>
+        <div class="card-body p-4">
+
+          <div class="text-center mb-4">
+            <div style="font-size:3rem;">✉️</div>
+            <h6 class="mt-2">Verificación de identidad — <strong>Declarante</strong></h6>
+            <p class="text-muted mb-1">
+              Se envió un código de 6 dígitos a:
+            </p>
+            <strong>{{ email }}</strong>
+          </div>
+
+          {% if messages %}
+            {% for msg in messages %}
+              <div class="alert alert-{{ msg.tags }}">{{ msg }}</div>
+            {% endfor %}
+          {% endif %}
+
+          {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+          {% endif %}
+
+          <div class="alert alert-info small">
+            <strong>¿Por qué se requiere este código?</strong><br>
+            Conforme a la Ley 527 de 1999 (Colombia), este código constituye la
+            <strong>firma electrónica simple</strong> del <strong>Declarante</strong>,
+            validando su identidad en el registro presentado.
+            El código tiene una vigencia de <strong>15 minutos</strong>.
+          </div>
+
+          <!-- Formulario de verificación -->
+          <form method="post" autocomplete="off">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="verificar">
+
+            <div class="mb-4">
+              <label class="form-label fw-bold text-center d-block">Código de verificación *</label>
+              <input
+                type="text"
+                name="codigo"
+                class="form-control form-control-lg text-center"
+                style="letter-spacing:12px;font-size:2rem;font-weight:bold;"
+                maxlength="6"
+                pattern="[0-9]{6}"
+                inputmode="numeric"
+                placeholder="_ _ _ _ _ _"
+                autofocus
+                required
+              >
+              <div class="form-text text-center">Ingrese los 6 dígitos recibidos en su correo electrónico.</div>
+            </div>
+
+            <div class="d-grid mb-3">
+              <button type="submit" class="btn btn-institucional btn-lg">
+                ✓ Confirmar firma — Declarante
+              </button>
+            </div>
+          </form>
+
+          <!-- Reenviar código -->
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reenviar">
+            <div class="text-center">
+              <p class="text-muted small mb-1">¿No recibió el código?</p>
+              <button type="submit" class="btn btn-outline-secondary btn-sm">
+                Reenviar código
+              </button>
+            </div>
+          </form>
+
+          <hr class="my-4">
+
+          <div class="text-center">
+            <small class="text-muted">
+              Registro RIT &mdash; Radicado: <strong>{{ registro.radicado|default:registro.id }}</strong><br>
+              {{ registro.nombre_razon_social }} &mdash;
+              {{ registro.get_opcion_uso_display }}
+            </small>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  document.querySelector('input[name="codigo"]').addEventListener('input', function() {
+    this.value = this.value.replace(/\D/g, '').substring(0, 6);
+  });
+</script>
+{% endblock %}

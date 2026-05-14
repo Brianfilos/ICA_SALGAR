@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<main class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-12 col-md-6 col-lg-5">
+
+      <div class="card shadow border-0">
+
+        <!-- Header -->
+        <div class="card-header text-center text-white py-4" style="background-color: var(--verde);">
+          <div class="mb-3">
+            <img src="{% static 'img/logo_ciudad.png' %}" style="width:200px; height:auto;">
+          </div>
+          <h4 class="mb-1 fw-bold" style="color:#fff;">Nueva Contraseña</h4>
+          <p class="mb-0" style="color:#fff;">Portal Tributario - Salgar</p>
+        </div>
+
+        <div class="card-body p-4 p-md-5">
+
+          {% if error %}
+            <div class="alert alert-danger mb-4">{{ error }}</div>
+          {% endif %}
+
+          <p class="text-muted mb-4">Ingresa tu nueva contraseña. Debe tener al menos 8 caracteres.</p>
+
+          <form method="post" data-loading="true" data-loading-text="Guardando...">
+            {% csrf_token %}
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Nueva contraseña</label>
+              <div class="input-group">
+                <input
+                  type="password"
+                  id="password1"
+                  name="password1"
+                  class="form-control form-control-lg"
+                  placeholder="Mínimo 8 caracteres"
+                  minlength="8"
+                  required
+                  autofocus
+                >
+                <button type="button" class="btn btn-outline-secondary" onclick="togglePass('password1', this)" tabindex="-1">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Confirmar contraseña</label>
+              <div class="input-group">
+                <input
+                  type="password"
+                  id="password2"
+                  name="password2"
+                  class="form-control form-control-lg"
+                  placeholder="Repite la contraseña"
+                  minlength="8"
+                  required
+                >
+                <button type="button" class="btn btn-outline-secondary" onclick="togglePass('password2', this)" tabindex="-1">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="d-grid mt-4">
+              <button type="submit" class="btn btn-institucional btn-lg">
+                <span class="btn-text">Guardar contraseña</span>
+              </button>
+            </div>
+          </form>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+{% block extra_js %}
+<script>
+function togglePass(id, btn) {
+  const input = document.getElementById(id);
+  const icon  = btn.querySelector('i');
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.classList.replace('bi-eye', 'bi-eye-slash');
+  } else {
+    input.type = 'password';
+    icon.classList.replace('bi-eye-slash', 'bi-eye');
+  }
+}
+</script>
+{% endblock %}
+{% endblock %}

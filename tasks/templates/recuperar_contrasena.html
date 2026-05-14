@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<main class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-12 col-md-6 col-lg-5">
+
+      <div class="card shadow border-0">
+
+        <!-- Header -->
+        <div class="card-header text-center text-white py-4" style="background-color: var(--verde);">
+          <div class="mb-3">
+            <img src="{% static 'img/logo_ciudad.png' %}" style="width:200px; height:auto;">
+          </div>
+          <h4 class="mb-1 fw-bold" style="color:#fff;">Recuperar Contraseña</h4>
+          <p class="mb-0" style="color:#fff;">Portal Tributario - Salgar</p>
+        </div>
+
+        <div class="card-body p-4 p-md-5">
+
+          {% if error %}
+            <div class="alert alert-danger mb-4">{{ error }}</div>
+          {% endif %}
+
+          <p class="text-muted mb-4">Ingresa tu nombre de usuario o correo electrónico registrado y te enviaremos un código de verificación.</p>
+
+          <form method="post" data-loading="true" data-loading-text="Enviando código...">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Usuario o correo electrónico</label>
+              <input
+                type="text"
+                name="username_or_email"
+                class="form-control form-control-lg"
+                placeholder="usuario o correo@dominio.com"
+                required
+                autofocus
+              >
+            </div>
+
+            <div class="d-grid mt-4">
+              <button type="submit" class="btn btn-institucional btn-lg">
+                <span class="btn-text">Enviar código</span>
+              </button>
+            </div>
+          </form>
+
+          <hr>
+          <p class="text-center mb-0">
+            <a href="{% url 'signin' %}" class="link-registro">Volver al inicio de sesión</a>
+          </p>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+{% endblock %}

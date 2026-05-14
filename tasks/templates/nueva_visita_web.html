@@ -1,0 +1,950 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-4" style="max-width:860px;">
+
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <a href="{% url 'mis_visitas' %}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h2 class="mb-0" id="tituloForm" style="text-decoration:none;">Nueva Visita de Campo</h2>
+      <p class="mb-0 text-muted" style="font-size:.85rem;">Registro desde el portal web</p>
+    </div>
+  </div>
+
+  <form id="visitaForm" method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    <!-- Campos ocultos que JS rellena -->
+    <input type="hidden" name="tipo_visita"            id="tipo_visita"            value="atendida">
+    <input type="hidden" name="firma_base64"           id="firma_base64">
+    <input type="hidden" name="firma_funcionario_base64" id="firma_funcionario_base64">
+    <input type="hidden" name="latitud"                id="latitud">
+    <input type="hidden" name="longitud"               id="longitud">
+    <input type="hidden" name="precision_gps"          id="precision_gps">
+    <input type="hidden" name="actividad_economica"    id="actividad_economica">
+    <input type="hidden" name="descripcion_actividad"  id="descripcion_actividad">
+    <input type="hidden" name="municipio"              id="municipio">
+    <input type="hidden" name="direccion_final"        id="direccion_final">
+
+    <!-- ── SELECTOR TIPO DE VISITA ───────────────────────────────────────── -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <div class="fw-bold mb-2" style="font-size:.9rem;">Tipo de visita</div>
+        <div class="row g-2">
+          <div class="col-4">
+            <div class="tipo-chip selected" data-tipo="atendida"
+                 style="--chip-color:#4B5563;"
+                 onclick="seleccionarTipo('atendida')">
+              <i class="bi bi-check-circle-fill"></i>
+              <span>Atendida</span>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="tipo-chip" data-tipo="incompleta"
+                 style="--chip-color:#E65100;"
+                 onclick="seleccionarTipo('incompleta')">
+              <i class="bi bi-hourglass-split"></i>
+              <span>Incompleta</span>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="tipo-chip" data-tipo="no_atendida"
+                 style="--chip-color:#DC0B2C;"
+                 onclick="seleccionarTipo('no_atendida')">
+              <i class="bi bi-slash-circle"></i>
+              <span>No atendida</span>
+            </div>
+          </div>
+        </div>
+        <div id="descTipo" class="mt-2 small text-muted">
+          El contribuyente está presente — registro completo con firma.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MOTIVO (solo no atendida) ─────────────────────────────────────── -->
+    <div id="secMotivo" class="card border-0 shadow-sm mb-3 d-none">
+      <div class="card-header text-white fw-bold" style="background:#DC0B2C;">
+        !. MOTIVO DE NO ATENCIÓN
+      </div>
+      <div class="card-body">
+        <label class="form-label fw-semibold">Motivo por el que no se atendió la visita</label>
+        <select name="motivo_no_atencion" id="motivo_no_atencion" class="form-select mb-2">
+          <option value="CERRADO">Local cerrado</option>
+          <option value="AUSENTE">Propietario / encargado ausente</option>
+          <option value="NEGATIVA">Se negó a atender</option>
+          <option value="DIRECCION">Dirección no encontrada</option>
+          <option value="OTRO">Otro motivo</option>
+        </select>
+        <div id="motivoOtroDiv" class="d-none">
+          <textarea name="motivo_descripcion" class="form-control" rows="2"
+                    placeholder="Describa el motivo..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── A. ENCABEZADO ─────────────────────────────────────────────────── -->
+    <div id="secA" class="card border-0 shadow-sm mb-3">
+      <div class="card-header text-white fw-bold" style="background:#1565C0;">
+        A. ENCABEZADO DEL REGISTRO
+      </div>
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Opción de uso</label>
+            <select name="opcion_uso" class="form-select form-select-sm">
+              <option value="INSCRIPCION">Inscripción</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Tipo de contribuyente</label>
+            <select name="clase_contribuyente" id="claseContribuyente" class="form-select form-select-sm"
+                    onchange="onClaseChange()">
+              <option value="REGIMEN_ORDINARIO">Ordinario</option>
+              <option value="REGIMEN_SIMPLIFICADO" disabled style="color:#aaa;">Régimen Simplificado ICA</option>
+              <option value="OCASIONAL">Ocasional</option>
+              <option value="ACTIVIDAD_INFORMAL">Actividad informal</option>
+              <option value="NO_SUJETO">No sujeto</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <div class="d-flex gap-4">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="es_retenedor" id="esRetenedor">
+                <label class="form-check-label small" for="esRetenedor">Agente de retención ICA</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="es_autorretenedor" id="esAutorretenedor">
+                <label class="form-check-label small" for="esAutorretenedor">Autorretenedor ICA</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── C. DATOS GENERALES ────────────────────────────────────────────── -->
+    <div id="secC" class="card border-0 shadow-sm mb-3">
+      <div class="card-header text-white fw-bold" style="background:#455a64;">
+        B. DATOS GENERALES
+      </div>
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-12">
+            <label class="form-label fw-semibold small">5. Nombres y apellidos o razón social *</label>
+            <input type="text" name="nombre_propietario" class="form-control form-control-sm" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold small">11. Tipo de persona</label>
+            <select name="tipo_persona" id="tipoPersona" class="form-select form-select-sm"
+                    onchange="onTipoPersonaChange()">
+              <option value="NATURAL">Natural</option>
+              <option value="JURIDICA">Jurídica</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold small">6. Tipo documento</label>
+            <select name="tipo_documento" id="tipoDoc" class="form-select form-select-sm"
+                    onchange="onTipoDocChange()">
+              <option value="CC">CC</option>
+              <option value="NIT">NIT</option>
+              <option value="CE">CE</option>
+              <option value="PASAPORTE">Pasaporte</option>
+              <option value="OTRO">Otro</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold small">No. documento *</label>
+            <input type="text" name="numero_documento" id="numeroDoc"
+                   class="form-control form-control-sm" oninput="calcDV()" required>
+          </div>
+          <div class="col-md-1" id="dvCol" style="display:none;">
+            <label class="form-label fw-semibold small">DV</label>
+            <input type="text" name="dv" id="dvField" class="form-control form-control-sm"
+                   readonly style="background:#f8f9fa;color:#888;">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold small">7. Domicilio principal *</label>
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+              <select id="cVia" class="form-select form-select-sm" style="width:90px;" onchange="buildDomicilio()">
+                <option>CLL</option><option>CRR</option><option>DIAG</option>
+                <option>TRANS</option><option>AV</option>
+              </select>
+              <input type="text" id="cVnum" class="form-control form-control-sm text-center"
+                     style="width:60px;" placeholder="Nro." oninput="buildDomicilio()">
+              <select id="cVletra" class="form-select form-select-sm" style="width:75px;" onchange="buildDomicilio()">
+                <option value="">Letra</option><option>A</option><option>B</option>
+                <option>C</option><option>D</option>
+              </select>
+              <span class="fw-bold text-primary small">CON</span>
+              <select id="cGvia" class="form-select form-select-sm" style="width:90px;" onchange="buildDomicilio()">
+                <option>CRR</option><option>CLL</option><option>DIAG</option>
+                <option>TRANS</option><option>AV</option>
+              </select>
+              <input type="text" id="cGnum" class="form-control form-control-sm text-center"
+                     style="width:60px;" placeholder="Nro." oninput="buildDomicilio()">
+              <select id="cGletra" class="form-select form-select-sm" style="width:75px;" onchange="buildDomicilio()">
+                <option value="">Letra</option><option>A</option><option>B</option>
+                <option>C</option><option>D</option>
+              </select>
+              <span class="fw-bold fs-5">-</span>
+              <input type="text" id="cPnum" class="form-control form-control-sm text-center"
+                     style="width:60px;" placeholder="Nro." oninput="buildDomicilio()">
+            </div>
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+              <select id="cComp" class="form-select form-select-sm" style="width:110px;" onchange="buildDomicilio()">
+                <option value="">Compl.</option><option>INT</option><option>APTO</option>
+                <option>LOCAL</option><option>LOTE</option><option>BLOQUE</option><option>PISO</option>
+              </select>
+              <input type="text" id="cCnum" class="form-control form-control-sm text-center"
+                     style="width:80px;" placeholder="Nro." oninput="buildDomicilio()">
+            </div>
+            <input type="text" id="domicilioPreview" class="form-control form-control-sm"
+                   style="background:#f8f9fa;font-weight:600;" readonly
+                   placeholder="Dirección generada automáticamente...">
+            <input type="hidden" name="domicilio" id="domicilioFinal">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold small">Municipio</label>
+            <input type="text" id="muniSearch" class="form-control form-control-sm"
+                   placeholder="Escriba para buscar..." autocomplete="off"
+                   oninput="buscarMunicipio(this.value)">
+            <div id="muniResultados" class="list-group mt-1" style="max-height:180px;overflow-y:auto;"></div>
+            <div id="muniSeleccionado" class="d-none mt-1">
+              <span class="badge rounded-pill px-3 py-2"
+                    style="background:#d1fae5;color:#065f46;font-size:.85rem;">
+                <i class="bi bi-check-circle me-1"></i>
+                <span id="muniSelNombre"></span>
+                <button type="button" class="btn-close btn-close-sm ms-2"
+                        style="font-size:.6rem;" onclick="limpiarMunicipio()"></button>
+              </span>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold small">8. Teléfono</label>
+            <input type="tel" name="telefono" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold small">9. Correo electrónico</label>
+            <input type="email" name="correo" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold small">10. No. establecimientos</label>
+            <input type="number" name="num_establecimientos" id="numEstablecimientos"
+                   class="form-control form-control-sm" value="1" min="0"
+                   oninput="onNumEstablChange()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── D. REPRESENTANTE LEGAL (solo atendida) ────────────────────────── -->
+    <div id="secD" class="card border-0 shadow-sm mb-3">
+      <div class="card-header text-white fw-bold" style="background:#455a64;">
+        C. REPRESENTACIÓN LEGAL
+      </div>
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-12">
+            <label class="form-label fw-semibold small">Nombre completo del representante</label>
+            <input type="text" name="rep_nombre" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold small">Tipo doc</label>
+            <select name="rep_tipo_doc" class="form-select form-select-sm">
+              <option value="CC">CC</option><option value="CE">CE</option>
+              <option value="PASAPORTE">Pasaporte</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold small">No. documento</label>
+            <input type="text" name="rep_documento" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold small">Correo</label>
+            <input type="email" name="rep_correo" class="form-control form-control-sm">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── E. ESTABLECIMIENTO ────────────────────────────────────────────── -->
+    <div id="secE" class="card border-0 shadow-sm mb-3">
+      <div class="card-header text-white fw-bold" style="background:#455a64;">
+        D. ESTABLECIMIENTO
+      </div>
+      <div class="card-body">
+        <div class="row g-2 mb-2">
+          <div class="col-12">
+            <label class="form-label fw-semibold small">Nombre del establecimiento</label>
+            <input type="text" name="nombre_establecimiento" class="form-control form-control-sm">
+          </div>
+        </div>
+
+        <!-- Constructor de dirección -->
+        <label class="form-label fw-semibold small mb-1">Dirección del establecimiento</label>
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+          <select id="dVia" class="form-select form-select-sm" style="width:90px;" onchange="buildDir()">
+            <option>CLL</option><option>CRR</option><option>DIAG</option>
+            <option>TRANS</option><option>AV</option>
+          </select>
+          <input type="text" id="dVnum" class="form-control form-control-sm text-center"
+                 style="width:60px;" placeholder="Nro." oninput="buildDir()">
+          <select id="dVletra" class="form-select form-select-sm" style="width:75px;" onchange="buildDir()">
+            <option value="">Letra</option><option>A</option><option>B</option>
+            <option>C</option><option>D</option>
+          </select>
+          <span class="fw-bold text-secondary small">CON</span>
+          <select id="dGvia" class="form-select form-select-sm" style="width:90px;" onchange="buildDir()">
+            <option>CRR</option><option>CLL</option><option>DIAG</option>
+            <option>TRANS</option><option>AV</option>
+          </select>
+          <input type="text" id="dGnum" class="form-control form-control-sm text-center"
+                 style="width:60px;" placeholder="Nro." oninput="buildDir()">
+          <select id="dGletra" class="form-select form-select-sm" style="width:75px;" onchange="buildDir()">
+            <option value="">Letra</option><option>A</option><option>B</option>
+            <option>C</option><option>D</option>
+          </select>
+          <span class="fw-bold fs-5">-</span>
+          <input type="text" id="dPnum" class="form-control form-control-sm text-center"
+                 style="width:60px;" placeholder="Nro." oninput="buildDir()">
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+          <select id="dComp" class="form-select form-select-sm" style="width:110px;" onchange="buildDir()">
+            <option value="">Compl.</option><option>INT</option><option>APTO</option>
+            <option>LOCAL</option><option>LOTE</option><option>BLOQUE</option><option>PISO</option>
+          </select>
+          <input type="text" id="dCnum" class="form-control form-control-sm text-center"
+                 style="width:80px;" placeholder="Nro." oninput="buildDir()">
+        </div>
+        <input type="text" id="dirResultado" class="form-control form-control-sm"
+               style="background:#f8f9fa;font-weight:600;" readonly
+               placeholder="Dirección generada automáticamente...">
+
+        <!-- Teléfono y avisos (ocultos en no-atendida) -->
+        <div id="estExtra" class="row g-2 mt-1">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Teléfono del establecimiento</label>
+            <input type="tel" name="tel_establecimiento" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-6 d-flex align-items-end pb-1">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="tiene_avisos" id="tieneAvisos">
+              <label class="form-check-label small" for="tieneAvisos">¿Tiene avisos y tableros?</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Establecimientos adicionales (cuando num > 1) -->
+    <div id="establAdicionales"></div>
+
+    <!-- ── F. ACTIVIDAD ECONÓMICA (oculta en no-atendida) ───────────────── -->
+    <div id="secF" class="card border-0 shadow-sm mb-3">
+      <div class="card-header text-white fw-bold" style="background:#455a64;">
+        E. ACTIVIDAD ECONÓMICA
+      </div>
+      <div class="card-body">
+        <input type="text" id="actSearch" class="form-control form-control-sm mb-2"
+               placeholder="Buscar por código o nombre..." oninput="buscarActividad(this.value)">
+        <div id="actSeleccionada" class="d-none mb-2">
+          <div class="p-2 rounded d-flex align-items-center gap-2"
+               style="background:#d1fae5;border:1px solid #6ee7b7;">
+            <i class="bi bi-check-circle text-success"></i>
+            <span id="actSelNombre" class="fw-semibold small flex-fill"></span>
+            <button type="button" class="btn-close" style="font-size:.65rem;"
+                    onclick="limpiarActividad()"></button>
+          </div>
+        </div>
+        <div id="actResultados" class="list-group" style="max-height:200px;overflow-y:auto;display:none;"></div>
+      </div>
+    </div>
+
+    <!-- ── GPS ──────────────────────────────────────────────────────────── -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header text-white fw-bold" style="background:var(--verde);" id="gpsHeader">
+        <i class="bi bi-geo-alt me-1"></i>UBICACIÓN GPS
+      </div>
+      <div class="card-body">
+        <div id="gpsNone">
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="capturarGPS()">
+            <i class="bi bi-crosshair me-1"></i>Capturar ubicación GPS
+          </button>
+        </div>
+        <div id="gpsCargando" class="d-none text-muted small">
+          <div class="spinner-border spinner-border-sm me-2"></div>Obteniendo ubicación...
+        </div>
+        <div id="gpsOk" class="d-none">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-geo-alt-fill text-success fs-5"></i>
+            <div>
+              <div id="gpsCoordenadas" class="fw-semibold small"></div>
+              <div id="gpsPrecision" class="text-muted" style="font-size:.78rem;"></div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary ms-auto"
+                    onclick="capturarGPS()">
+              <i class="bi bi-arrow-repeat"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── FOTOS ─────────────────────────────────────────────────────────── -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header text-white fw-bold" style="background:var(--verde);" id="fotosHeader">
+        <i class="bi bi-images me-1"></i>FOTOS DEL ESTABLECIMIENTO
+      </div>
+      <div class="card-body">
+        <input type="file" name="fotos" id="fotosInput" multiple accept="image/*"
+               class="form-control form-control-sm mb-2" onchange="mostrarPreviews()">
+        <div id="fotoPreviews" class="d-flex flex-wrap gap-2"></div>
+      </div>
+    </div>
+
+    <!-- ── OBSERVACIONES ─────────────────────────────────────────────────── -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header text-white fw-bold" style="background:var(--verde);" id="obsHeader">
+        <i class="bi bi-chat-text me-1"></i>OBSERVACIONES
+      </div>
+      <div class="card-body">
+        <textarea name="observaciones" class="form-control form-control-sm" rows="3"
+                  placeholder="Observaciones del funcionario en campo..."></textarea>
+      </div>
+    </div>
+
+    <!-- ── G. FIRMA CONTRIBUYENTE (atendida/incompleta) ──────────────────── -->
+    <div id="secFirma" class="card border-0 shadow-sm mb-3">
+      <div class="card-header text-white fw-bold" style="background:#455a64;" id="firmaHeader">
+        F. FIRMA DEL CONTRIBUYENTE
+      </div>
+      <div class="card-body">
+        <div id="firmaIncompletaAviso" class="alert alert-warning py-2 small d-none">
+          <i class="bi bi-info-circle me-1"></i>
+          La firma es opcional en visita incompleta. El propietario puede firmarla luego en el portal.
+        </div>
+        <p class="small text-muted mb-2">Firma del contribuyente:</p>
+        <canvas id="canvasFirma" width="600" height="160"
+                style="border:1px solid #ccc;border-radius:8px;cursor:crosshair;width:100%;touch-action:none;">
+        </canvas>
+        <div class="d-flex gap-2 mt-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="limpiarCanvas('canvasFirma')">
+            <i class="bi bi-eraser me-1"></i>Limpiar
+          </button>
+          <button type="button" class="btn btn-sm btn-institucional" onclick="confirmarFirma()">
+            <i class="bi bi-check me-1"></i>Confirmar firma
+          </button>
+          <span id="firmaOk" class="d-none align-items-center gap-1 text-success small ms-2">
+            <i class="bi bi-check-circle-fill"></i> Capturada
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── H. FIRMA FUNCIONARIO (atendida/incompleta) ────────────────────── -->
+    <div id="secFirmaFunc" class="card border-0 shadow-sm mb-3">
+      <div class="card-header text-white fw-bold" style="background:var(--verde);" id="firmaFuncHeader">
+        G. FIRMA DEL FUNCIONARIO
+      </div>
+      <div class="card-body">
+        <p class="small text-muted mb-2">Firma del funcionario visitador:</p>
+        <canvas id="canvasFirmaFunc" width="600" height="160"
+                style="border:2px solid var(--verde);border-radius:8px;cursor:crosshair;width:100%;touch-action:none;">
+        </canvas>
+        <div class="d-flex gap-2 mt-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="limpiarCanvas('canvasFirmaFunc')">
+            <i class="bi bi-eraser me-1"></i>Limpiar
+          </button>
+          <button type="button" class="btn btn-sm btn-institucional" onclick="confirmarFirmaFuncionario()">
+            <i class="bi bi-check me-1"></i>Confirmar firma
+          </button>
+          <span id="firmaFuncOk" class="d-none align-items-center gap-1 text-success small ms-2">
+            <i class="bi bi-check-circle-fill"></i> Capturada
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── BOTÓN GUARDAR ─────────────────────────────────────────────────── -->
+    <button type="submit" id="btnGuardar" class="btn btn-institucional w-100 mb-4"
+            onclick="return prepararEnvio()">
+      <i class="bi bi-floppy me-2"></i>
+      <span id="btnGuardarTxt">Guardar visita RIT</span>
+    </button>
+  </form>
+</div>
+
+<style>
+.tipo-chip {
+  border: 2px solid #dee2e6;
+  border-radius: 10px;
+  padding: 12px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .18s;
+  background: #f8f9fa;
+  color: #666;
+  user-select: none;
+}
+.tipo-chip i { display: block; font-size: 1.4rem; margin-bottom: 4px; }
+.tipo-chip span { font-size: .8rem; font-weight: 600; }
+.tipo-chip.selected {
+  background: var(--chip-color);
+  border-color: var(--chip-color);
+  color: #fff;
+}
+.tipo-chip:not(.selected):hover { border-color: var(--chip-color); color: var(--chip-color); }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Estado global ─────────────────────────────────────────────────────────────
+let tipoVisita = 'atendida';
+let muniTimeout = null;
+
+// ── Selector tipo de visita ───────────────────────────────────────────────────
+const TIPO_DESC = {
+  atendida:    'El contribuyente está presente — registro completo con firma.',
+  incompleta:  'Recopila todos los datos posibles — firma opcional.',
+  no_atendida: 'Solo se captura el establecimiento, ubicación y motivo.',
+};
+const TIPO_BTNTXT = {
+  atendida:    'Guardar visita RIT',
+  incompleta:  'Guardar visita incompleta',
+  no_atendida: 'Registrar visita no atendida',
+};
+
+function seleccionarTipo(tipo) {
+  tipoVisita = tipo;
+  document.getElementById('tipo_visita').value = tipo;
+  document.querySelectorAll('.tipo-chip').forEach(c => {
+    c.classList.toggle('selected', c.dataset.tipo === tipo);
+  });
+  document.getElementById('descTipo').textContent = TIPO_DESC[tipo];
+  document.getElementById('btnGuardarTxt').textContent = TIPO_BTNTXT[tipo];
+
+  const noAten   = tipo === 'no_atendida';
+  const incomp   = tipo === 'incompleta';
+  const firmaTxt = incomp ? 'F. FIRMA DEL CONTRIBUYENTE (OPCIONAL)' : 'F. FIRMA DEL CONTRIBUYENTE';
+  const funcTxt  = incomp ? 'G. FIRMA DEL FUNCIONARIO (OPCIONAL)'   : 'G. FIRMA DEL FUNCIONARIO';
+
+  toggle('secMotivo',       noAten);
+  toggle('secA',           !noAten);
+  toggle('secC',           !noAten);
+  toggle('secD',            tipo === 'atendida');
+  toggle('secF',           !noAten);
+  toggle('secFirma',       !noAten);
+  toggle('secFirmaFunc',   !noAten);
+  toggle('estExtra',       !noAten);
+  toggleVisible('firmaIncompletaAviso', incomp);
+  document.getElementById('firmaHeader').textContent    = firmaTxt;
+  document.getElementById('firmaFuncHeader').textContent = funcTxt;
+
+  // Actualizar color encabezado de tarjetas de GPS/fotos/obs
+  const colorGPS = noAten ? '#DC0B2C' : (incomp ? '#E65100' : 'var(--verde)');
+  ['gpsHeader','fotosHeader','obsHeader'].forEach(id => {
+    document.getElementById(id).style.background = colorGPS;
+  });
+}
+
+function toggle(id, show) {
+  document.getElementById(id).classList.toggle('d-none', !show);
+}
+function toggleVisible(id, show) {
+  document.getElementById(id).classList.toggle('d-none', !show);
+}
+
+// ── Tipo contribuyente → auto-check Agente de retención ──────────────────────
+function onClaseChange() {
+  if (document.getElementById('claseContribuyente').value === 'NO_SUJETO') {
+    document.getElementById('esRetenedor').checked = true;
+  }
+}
+
+// ── Tipo persona → auto-NIT ───────────────────────────────────────────────────
+function onTipoPersonaChange() {
+  if (document.getElementById('tipoPersona').value === 'JURIDICA') {
+    document.getElementById('tipoDoc').value = 'NIT';
+    onTipoDocChange();
+  }
+}
+
+// ── DV automático NIT ─────────────────────────────────────────────────────────
+function onTipoDocChange() {
+  const isNIT = document.getElementById('tipoDoc').value === 'NIT';
+  document.getElementById('dvCol').style.display = isNIT ? '' : 'none';
+  if (!isNIT) document.getElementById('dvField').value = '';
+  else calcDV();
+}
+
+function calcDV() {
+  if (document.getElementById('tipoDoc').value !== 'NIT') return;
+  const pesos = [71,67,59,53,47,43,41,37,29,23,19,17,13,7,3];
+  const digits = document.getElementById('numeroDoc').value.replace(/\D/g,'');
+  if (!digits) { document.getElementById('dvField').value = ''; return; }
+  const start = pesos.length - digits.length;
+  if (start < 0) { document.getElementById('dvField').value = ''; return; }
+  let sum = 0;
+  for (let i = 0; i < digits.length; i++) sum += parseInt(digits[i]) * pesos[start+i];
+  const r = sum % 11;
+  document.getElementById('dvField').value = (r < 2 ? r : 11-r).toString();
+}
+
+// ── Constructor domicilio principal (sección C) ───────────────────────────────
+function buildDomicilio() {
+  const via  = document.getElementById('cVia').value;
+  const vnum = document.getElementById('cVnum').value.trim();
+  const vlet = document.getElementById('cVletra').value;
+  const gvia = document.getElementById('cGvia').value;
+  const gnum = document.getElementById('cGnum').value.trim();
+  const glet = document.getElementById('cGletra').value;
+  const pnum = document.getElementById('cPnum').value.trim();
+  const comp = document.getElementById('cComp').value;
+  const cnum = document.getElementById('cCnum').value.trim();
+
+  let dir = via;
+  if (vnum) dir += ' ' + vnum;
+  if (vlet) dir += vlet;
+  dir += ' CON ' + gvia;
+  if (gnum) dir += ' ' + gnum;
+  if (glet) dir += glet;
+  if (pnum) dir += ' - ' + pnum;
+  if (comp && cnum) dir += ' ' + comp + ' ' + cnum;
+  else if (comp) dir += ' ' + comp;
+
+  const res = dir.trim();
+  document.getElementById('domicilioPreview').value = res;
+  document.getElementById('domicilioFinal').value   = res;
+}
+
+// ── Constructor dirección establecimiento adicional ───────────────────────────
+function buildDirAdd(i) {
+  const via  = document.getElementById('dVia_'+i).value;
+  const vnum = document.getElementById('dVnum_'+i).value.trim();
+  const vlet = document.getElementById('dVletra_'+i).value;
+  const gvia = document.getElementById('dGvia_'+i).value;
+  const gnum = document.getElementById('dGnum_'+i).value.trim();
+  const glet = document.getElementById('dGletra_'+i).value;
+  const pnum = document.getElementById('dPnum_'+i).value.trim();
+  const comp = document.getElementById('dComp_'+i).value;
+  const cnum = document.getElementById('dCnum_'+i).value.trim();
+  let dir = via;
+  if (vnum) dir += ' ' + vnum;
+  if (vlet) dir += vlet;
+  dir += ' CON ' + gvia;
+  if (gnum) dir += ' ' + gnum;
+  if (glet) dir += glet;
+  if (pnum) dir += ' - ' + pnum;
+  if (comp && cnum) dir += ' ' + comp + ' ' + cnum;
+  else if (comp) dir += ' ' + comp;
+  const res = dir.trim();
+  document.getElementById('dirResultado_'+i).value = res;
+  document.getElementById('est_add_direccion_'+i).value = res;
+}
+
+// ── Establecimientos adicionales ──────────────────────────────────────────────
+function onNumEstablChange() {
+  const n = parseInt(document.getElementById('numEstablecimientos').value) || 0;
+  toggle('secE', n !== 0);
+  const cont = document.getElementById('establAdicionales');
+  cont.innerHTML = '';
+  for (let i = 2; i <= n; i++) {
+    cont.innerHTML += `
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header text-white fw-bold" style="background:#455a64;">
+          D${i}. ESTABLECIMIENTO ${i}
+        </div>
+        <div class="card-body">
+          <div class="mb-2">
+            <label class="form-label fw-semibold small">Nombre del establecimiento</label>
+            <input type="text" name="est_add_nombre_${i}" class="form-control form-control-sm">
+          </div>
+          <label class="form-label fw-semibold small">Dirección del establecimiento</label>
+          <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+            <select id="dVia_${i}" class="form-select form-select-sm" style="width:90px" onchange="buildDirAdd(${i})">
+              <option>CLL</option><option>CRR</option><option>DIAG</option><option>TRANS</option><option>AV</option>
+            </select>
+            <input type="text" id="dVnum_${i}" class="form-control form-control-sm text-center" style="width:60px" placeholder="Nro." oninput="buildDirAdd(${i})">
+            <select id="dVletra_${i}" class="form-select form-select-sm" style="width:75px" onchange="buildDirAdd(${i})">
+              <option value="">Letra</option><option>A</option><option>B</option><option>C</option><option>D</option>
+            </select>
+            <span class="fw-bold text-primary small">CON</span>
+            <select id="dGvia_${i}" class="form-select form-select-sm" style="width:90px" onchange="buildDirAdd(${i})">
+              <option>CRR</option><option>CLL</option><option>DIAG</option><option>TRANS</option><option>AV</option>
+            </select>
+            <input type="text" id="dGnum_${i}" class="form-control form-control-sm text-center" style="width:60px" placeholder="Nro." oninput="buildDirAdd(${i})">
+            <select id="dGletra_${i}" class="form-select form-select-sm" style="width:75px" onchange="buildDirAdd(${i})">
+              <option value="">Letra</option><option>A</option><option>B</option><option>C</option><option>D</option>
+            </select>
+            <span class="fw-bold fs-5">-</span>
+            <input type="text" id="dPnum_${i}" class="form-control form-control-sm text-center" style="width:60px" placeholder="Nro." oninput="buildDirAdd(${i})">
+          </div>
+          <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+            <select id="dComp_${i}" class="form-select form-select-sm" style="width:110px" onchange="buildDirAdd(${i})">
+              <option value="">Compl.</option><option>INT</option><option>APTO</option>
+              <option>LOCAL</option><option>LOTE</option><option>BLOQUE</option><option>PISO</option>
+            </select>
+            <input type="text" id="dCnum_${i}" class="form-control form-control-sm text-center" style="width:80px" placeholder="Nro." oninput="buildDirAdd(${i})">
+          </div>
+          <input type="text" id="dirResultado_${i}" class="form-control form-control-sm mb-2"
+                 style="background:#f8f9fa;font-weight:600;" readonly placeholder="Dirección generada...">
+          <input type="hidden" name="est_add_direccion_${i}" id="est_add_direccion_${i}">
+          <div class="d-flex align-items-center gap-3 mt-2">
+            <div class="flex-fill">
+              <label class="form-label fw-semibold small">Teléfono del establecimiento</label>
+              <input type="tel" name="est_add_telefono_${i}" class="form-control form-control-sm">
+            </div>
+            <div class="form-check mt-3">
+              <input class="form-check-input" type="checkbox" name="est_add_avisos_${i}" id="avisos_${i}">
+              <label class="form-check-label small" for="avisos_${i}">¿Tiene avisos y tableros?</label>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    buildDirAdd(i);
+  }
+}
+
+// ── Constructor de dirección ──────────────────────────────────────────────────
+function buildDir() {
+  const via   = document.getElementById('dVia').value;
+  const vnum  = document.getElementById('dVnum').value.trim();
+  const vlet  = document.getElementById('dVletra').value;
+  const gvia  = document.getElementById('dGvia').value;
+  const gnum  = document.getElementById('dGnum').value.trim();
+  const glet  = document.getElementById('dGletra').value;
+  const pnum  = document.getElementById('dPnum').value.trim();
+  const comp  = document.getElementById('dComp').value;
+  const cnum  = document.getElementById('dCnum').value.trim();
+
+  let dir = via;
+  if (vnum) dir += ' ' + vnum;
+  if (vlet) dir += vlet;
+  dir += ' CON ' + gvia;
+  if (gnum) dir += ' ' + gnum;
+  if (glet) dir += glet;
+  if (pnum) dir += ' - ' + pnum;
+  if (comp && cnum) dir += ' ' + comp + ' ' + cnum;
+  else if (comp) dir += ' ' + comp;
+
+  const res = dir.trim();
+  document.getElementById('dirResultado').value = res;
+  document.getElementById('direccion_final').value = res;
+}
+
+// ── Búsqueda municipio ────────────────────────────────────────────────────────
+function buscarMunicipio(q) {
+  clearTimeout(muniTimeout);
+  if (q.length < 2) { document.getElementById('muniResultados').innerHTML = ''; return; }
+  muniTimeout = setTimeout(() => {
+    fetch(`{% url 'json_municipios_visita' %}?q=${encodeURIComponent(q)}`)
+      .then(r => r.json())
+      .then(data => {
+        const el = document.getElementById('muniResultados');
+        el.innerHTML = '';
+        data.results.forEach(m => {
+          const a = document.createElement('a');
+          a.href = '#';
+          a.className = 'list-group-item list-group-item-action py-1 px-2';
+          a.style.fontSize = '.85rem';
+          a.innerHTML = `<strong>${m.nombre}</strong> <span class="text-muted">${m.departamento}</span>`;
+          a.addEventListener('click', e => {
+            e.preventDefault();
+            seleccionarMunicipio(m.nombre);
+          });
+          el.appendChild(a);
+        });
+      });
+  }, 300);
+}
+
+function seleccionarMunicipio(nombre) {
+  document.getElementById('municipio').value = nombre;
+  document.getElementById('muniSearch').value = nombre;
+  document.getElementById('muniResultados').innerHTML = '';
+  document.getElementById('muniSelNombre').textContent = nombre;
+  document.getElementById('muniSeleccionado').classList.remove('d-none');
+}
+
+function limpiarMunicipio() {
+  document.getElementById('municipio').value = '';
+  document.getElementById('muniSearch').value = '';
+  document.getElementById('muniSeleccionado').classList.add('d-none');
+}
+
+// ── Búsqueda actividad ────────────────────────────────────────────────────────
+let actTimeout = null;
+function buscarActividad(q) {
+  clearTimeout(actTimeout);
+  const resEl = document.getElementById('actResultados');
+  if (!q) { resEl.style.display='none'; resEl.innerHTML=''; return; }
+  actTimeout = setTimeout(() => {
+    fetch(`{% url 'json_actividades_visita' %}?q=${encodeURIComponent(q)}`)
+      .then(r => r.json())
+      .then(data => {
+        resEl.innerHTML = '';
+        if (!data.results.length) {
+          resEl.innerHTML = '<div class="list-group-item text-muted small">Sin resultados</div>';
+        } else {
+          data.results.forEach(a => {
+            const el = document.createElement('a');
+            el.href = '#';
+            el.className = 'list-group-item list-group-item-action py-1 px-2';
+            el.style.fontSize = '.85rem';
+            el.textContent = `${a.codigo} — ${a.nombre}`;
+            el.addEventListener('click', e => {
+              e.preventDefault();
+              seleccionarActividad(a.codigo, a.nombre);
+            });
+            resEl.appendChild(el);
+          });
+        }
+        resEl.style.display = '';
+      });
+  }, 250);
+}
+
+function seleccionarActividad(codigo, nombre) {
+  document.getElementById('actividad_economica').value = codigo;
+  document.getElementById('descripcion_actividad').value = nombre;
+  document.getElementById('actSearch').value = '';
+  document.getElementById('actSelNombre').textContent = `${codigo} — ${nombre}`;
+  document.getElementById('actSeleccionada').classList.remove('d-none');
+  document.getElementById('actResultados').style.display = 'none';
+}
+
+function limpiarActividad() {
+  document.getElementById('actividad_economica').value = '';
+  document.getElementById('descripcion_actividad').value = '';
+  document.getElementById('actSeleccionada').classList.add('d-none');
+}
+
+// ── GPS ───────────────────────────────────────────────────────────────────────
+function capturarGPS() {
+  if (!navigator.geolocation) { alert('Tu navegador no soporta GPS'); return; }
+  toggle('gpsNone', false);
+  toggle('gpsCargando', true);
+  toggle('gpsOk', false);
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      document.getElementById('latitud').value      = pos.coords.latitude;
+      document.getElementById('longitud').value     = pos.coords.longitude;
+      document.getElementById('precision_gps').value = pos.coords.accuracy;
+      document.getElementById('gpsCoordenadas').textContent =
+        `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+      document.getElementById('gpsPrecision').textContent =
+        `Precisión: ${pos.coords.accuracy.toFixed(0)} m`;
+      toggle('gpsCargando', false);
+      toggle('gpsOk', true);
+    },
+    err => {
+      toggle('gpsCargando', false);
+      toggle('gpsNone', true);
+      alert('No se pudo obtener la ubicación: ' + err.message);
+    },
+    { enableHighAccuracy: true, timeout: 15000 }
+  );
+}
+
+// ── Fotos preview ─────────────────────────────────────────────────────────────
+function mostrarPreviews() {
+  const files = document.getElementById('fotosInput').files;
+  const cont  = document.getElementById('fotoPreviews');
+  cont.innerHTML = '';
+  Array.from(files).forEach(f => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.style.cssText = 'width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid #ddd;';
+      cont.appendChild(img);
+    };
+    reader.readAsDataURL(f);
+  });
+}
+
+// ── Signature canvas ──────────────────────────────────────────────────────────
+function initCanvas(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  let drawing = false;
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const src = e.touches ? e.touches[0] : e;
+    return { x: (src.clientX - rect.left) * scaleX,
+             y: (src.clientY - rect.top)  * scaleY };
+  }
+
+  canvas.addEventListener('mousedown',  e => { drawing=true; ctx.beginPath(); const p=getPos(e); ctx.moveTo(p.x,p.y); });
+  canvas.addEventListener('mousemove',  e => { if(!drawing) return; const p=getPos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); });
+  canvas.addEventListener('mouseup',    () => drawing=false);
+  canvas.addEventListener('mouseleave', () => drawing=false);
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; ctx.beginPath(); const p=getPos(e); ctx.moveTo(p.x,p.y); }, {passive:false});
+  canvas.addEventListener('touchmove',  e => { e.preventDefault(); if(!drawing) return; const p=getPos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); }, {passive:false});
+  canvas.addEventListener('touchend',   () => drawing=false);
+
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth   = 2;
+  ctx.lineCap     = 'round';
+}
+
+function limpiarCanvas(id) {
+  const c = document.getElementById(id);
+  c.getContext('2d').clearRect(0, 0, c.width, c.height);
+  if (id === 'canvasFirma')     { document.getElementById('firma_base64').value=''; document.getElementById('firmaOk').classList.add('d-none'); }
+  if (id === 'canvasFirmaFunc') { document.getElementById('firma_funcionario_base64').value=''; document.getElementById('firmaFuncOk').classList.add('d-none'); }
+}
+
+function confirmarFirma() {
+  const c = document.getElementById('canvasFirma');
+  document.getElementById('firma_base64').value = c.toDataURL('image/png');
+  document.getElementById('firmaOk').classList.remove('d-none');
+  document.getElementById('firmaOk').style.display = 'inline-flex';
+}
+
+function confirmarFirmaFuncionario() {
+  const c = document.getElementById('canvasFirmaFunc');
+  document.getElementById('firma_funcionario_base64').value = c.toDataURL('image/png');
+  document.getElementById('firmaFuncOk').classList.remove('d-none');
+  document.getElementById('firmaFuncOk').style.display = 'inline-flex';
+}
+
+// ── Validar y preparar envío ──────────────────────────────────────────────────
+function prepararEnvio() {
+  const noAten = tipoVisita === 'no_atendida';
+  const nombre = noAten
+    ? document.querySelector('[name="nombre_establecimiento"]').value.trim()
+    : document.querySelector('[name="nombre_propietario"]').value.trim();
+
+  if (!nombre) {
+    alert('El nombre del ' + (noAten ? 'establecimiento' : 'contribuyente / razón social') + ' es obligatorio.');
+    return false;
+  }
+  if (noAten && !document.getElementById('direccion_final').value) {
+    alert('La dirección del establecimiento es obligatoria.');
+    return false;
+  }
+  return true;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initCanvas('canvasFirma');
+  initCanvas('canvasFirmaFunc');
+  buildDir();
+  buildDomicilio();
+  seleccionarTipo('atendida');
+  document.getElementById('motivo_no_atencion').addEventListener('change', function() {
+    document.getElementById('motivoOtroDiv').classList.toggle('d-none', this.value !== 'OTRO');
+  });
+});
+</script>
+{% endblock %}

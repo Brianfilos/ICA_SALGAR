@@ -1,0 +1,480 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <h3 class="text-center mb-4">
+    REGISTRO DE CONTRIBUYENTE<br>
+    <small class="text-muted">Portal Tributario</small>
+  </h3>
+
+  {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+
+  <div class="alert alert-info">
+    <strong>Nota:</strong> Tu usuario será tu correo electrónico. Se te enviará una contraseña temporal al correo que registres.
+  </div>
+
+  {% if prefill.ref %}
+  <div class="alert alert-success border-success">
+    <i class="bi bi-qr-code-scan me-2"></i>
+    <strong>Registro desde visita de campo</strong> — La Alcaldía de Salgar registró tu establecimiento
+    <strong>{{ prefill.est }}</strong> durante una visita de campo (<em>{{ prefill.ref }}</em>).
+    Algunos datos han sido pre-llenados. Completa tu información personal para acceder al Portal Tributario.
+  </div>
+  {% endif %}
+
+  <form method="post" novalidate data-loading="true" data-loading-text="Creando tu cuenta...">
+    {% csrf_token %}
+
+    <!-- ========================= -->
+    <!-- INFORMACIÓN DEL CONTRIBUYENTE -->
+    <!-- ========================= -->
+    <div class="card mb-3">
+      <div class="card-header bg-dark text-white">
+        INFORMACIÓN DEL CONTRIBUYENTE
+      </div>
+      <div class="card-body">
+
+        <!-- Fila: Nombre/Razón social + Documento -->
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Nombres y apellidos o razón social *</label>
+            {{ perfil_form.nombre_razon_social }}
+            {% if perfil_form.nombre_razon_social.errors %}
+              <div class="text-danger small">{{ perfil_form.nombre_razon_social.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Tipo de documento *</label>
+            {{ perfil_form.tipo_documento }}
+            {% if perfil_form.tipo_documento.errors %}
+              <div class="text-danger small">{{ perfil_form.tipo_documento.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Número de documento *</label>
+            {{ perfil_form.numero_documento }}
+            {% if perfil_form.numero_documento.errors %}
+              <div class="text-danger small">{{ perfil_form.numero_documento.errors }}</div>
+            {% endif %}
+          </div>
+
+          <!-- DV solo para NIT -->
+          <div class="col-md-1" id="dv_wrap" style="display:none;">
+            <label class="form-label">DV</label>
+            {{ perfil_form.dv }}
+            {% if perfil_form.dv.errors %}
+              <div class="text-danger small">{{ perfil_form.dv.errors }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- "Cuál documento" solo si tipo_documento=OTRO -->
+        <div class="row g-3 mt-1" id="cual_documento_wrap" style="display:none;">
+          <div class="col-md-6">
+            <label class="form-label">Especifique el tipo de documento *</label>
+            {{ perfil_form.cual_documento }}
+            {% if perfil_form.cual_documento.errors %}
+              <div class="text-danger small">{{ perfil_form.cual_documento.errors }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Fila: 7. Domicilio principal (Dirección + Municipio + Departamento) -->
+        <div class="row g-3 mt-1">
+          <div class="col-md-6">
+            <label class="form-label">7. Domicilio principal *</label>
+            <!-- Constructor de dirección estilo IGAC -->
+            <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+              <select id="v_tipo" class="form-select form-select-sm" style="width:90px" title="Tipo de vía">
+                <option value="CLL">CLL</option>
+                <option value="CRR">CRR</option>
+                <option value="DIAG">DIAG</option>
+                <option value="TRANS">TRANS</option>
+                <option value="AV">AV</option>
+              </select>
+              <input type="text" id="v_num" class="form-control form-control-sm" placeholder="Nro." style="width:60px" title="Número de vía">
+              <select id="v_letra" class="form-select form-select-sm" style="width:70px" title="Letra vía">
+                <option value="">Letra</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+              </select>
+              <span class="fw-bold text-primary px-1">CON</span>
+              <select id="g_tipo" class="form-select form-select-sm" style="width:90px" title="Tipo vía generadora">
+                <option value="CLL">CLL</option>
+                <option value="CRR">CRR</option>
+                <option value="DIAG">DIAG</option>
+                <option value="TRANS">TRANS</option>
+                <option value="AV">AV</option>
+              </select>
+              <input type="text" id="g_num" class="form-control form-control-sm" placeholder="Nro." style="width:60px" title="Número generador">
+              <select id="g_letra" class="form-select form-select-sm" style="width:70px" title="Letra generador">
+                <option value="">Letra</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+              </select>
+              <span class="fw-bold text-secondary px-1">-</span>
+              <input type="text" id="p_num" class="form-control form-control-sm" placeholder="Nro." style="width:60px" title="Número del predio">
+            </div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <select id="c_tipo" class="form-select form-select-sm" style="width:130px" title="Complemento">
+                <option value="">Complemento</option>
+                <option value="INT">Interior</option>
+                <option value="APTO">Apto.</option>
+                <option value="LOCAL">Local</option>
+                <option value="LOTE">Lote</option>
+                <option value="BLOQUE">Bloque</option>
+                <option value="PISO">Piso</option>
+              </select>
+              <input type="text" id="c_num" class="form-control form-control-sm" placeholder="Nro." style="width:80px" title="Número complemento">
+            </div>
+            <!-- Vista previa de la dirección -->
+            <input type="text" id="addr_preview" class="form-control form-control-sm bg-light"
+                   readonly placeholder="Dirección generada automáticamente..."
+                   style="font-weight:500; color:#212529;">
+            <!-- Campo real oculto — JS lo llena -->
+            <input type="hidden" name="direccion_notificacion" id="id_direccion_notificacion">
+            {% if perfil_form.direccion_notificacion.errors %}
+              <div class="text-danger small">{{ perfil_form.direccion_notificacion.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Municipio *</label>
+            {{ perfil_form.municipio_notificacion }}
+            {% if perfil_form.municipio_notificacion.errors %}
+              <div class="text-danger small">{{ perfil_form.municipio_notificacion.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Departamento</label>
+            <input type="text" class="form-control" id="departamento_preview" readonly placeholder="(automático)">
+          </div>
+        </div>
+
+        <!-- Fila: Teléfono + Correo + # Establecimientos -->
+        <div class="row g-3 mt-1">
+          <div class="col-md-3">
+            <label class="form-label">8. Teléfono *</label>
+            {{ perfil_form.telefono }}
+            {% if perfil_form.telefono.errors %}
+              <div class="text-danger small">{{ perfil_form.telefono.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="col-md-5">
+            <label class="form-label">9. Correo electrónico *</label>
+            {{ perfil_form.correo_electronico }}
+            {% if perfil_form.correo_electronico.errors %}
+              <div class="text-danger small">{{ perfil_form.correo_electronico.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">10. Número de establecimientos *</label>
+            {{ perfil_form.numero_establecimientos }}
+            {% if perfil_form.numero_establecimientos.errors %}
+              <div class="text-danger small">{{ perfil_form.numero_establecimientos.errors }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Fila: Tipo persona + Tipo jurídica -->
+        <div class="row g-3 mt-1">
+          <div class="col-md-4">
+            <label class="form-label">11. Tipo de persona *</label>
+            {{ perfil_form.tipo_persona }}
+            {% if perfil_form.tipo_persona.errors %}
+              <div class="text-danger small">{{ perfil_form.tipo_persona.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="col-md-4" id="bloque-juridica" style="display:none;">
+            <label class="form-label">Tipo jurídica *</label>
+            {{ perfil_form.tipo_juridica }}
+            {% if perfil_form.tipo_juridica.errors %}
+              <div class="text-danger small">{{ perfil_form.tipo_juridica.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="col-md-4" id="bloque-otro" style="display:none;">
+            <label class="form-label">Especifique el tipo jurídico *</label>
+            {{ perfil_form.otro_tipo_juridica }}
+            {% if perfil_form.otro_tipo_juridica.errors %}
+              <div class="text-danger small">{{ perfil_form.otro_tipo_juridica.errors }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Fila: Clasificación contribuyente -->
+        <div class="row g-3 mt-1">
+          <div class="col-md-4">
+            <label class="form-label">12. Clasificación contribuyente *</label>
+            {{ perfil_form.clasificacion_contribuyente }}
+            {% if perfil_form.clasificacion_contribuyente.errors %}
+              <div class="text-danger small">{{ perfil_form.clasificacion_contribuyente.errors }}</div>
+            {% endif %}
+          </div>
+          <div class="col-md-4" id="bloque-otra-clasificacion" style="display:none;">
+            <label class="form-label">Especifique la clasificación *</label>
+            {{ perfil_form.otra_clasificacion }}
+            {% if perfil_form.otra_clasificacion.errors %}
+              <div class="text-danger small">{{ perfil_form.otra_clasificacion.errors }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- BOTÓN REGISTRARSE -->
+    <!-- ========================= -->
+    <div class="d-grid gap-2 mb-4">
+      <button type="submit" class="btn btn-institucional btn-lg">
+        <span class="btn-text">Registrarse</span>
+      </button>
+    </div>
+
+    <p class="text-center">
+      ¿Ya tienes cuenta? <a href="{% url 'signin' %}">Iniciar sesión</a>
+    </p>
+
+  </form>
+
+</div>
+
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+
+<!-- jQuery + Select2 JS -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+$(document).ready(function() {
+
+  // =====================
+  // Select2 para municipio
+  // =====================
+  $('#id_municipio_notificacion').select2({
+    theme: 'bootstrap-5',
+    placeholder: 'Seleccione un municipio',
+    allowClear: true,
+    width: '100%'
+  });
+
+  // =====================
+  // Mapeo municipio -> departamento (usando JSON del servidor)
+  // =====================
+  const municipiosDepartamentos = {{ municipios_json|safe }};
+
+  function actualizarDepartamento() {
+    const municipioId = $('#id_municipio_notificacion').val();
+    const departamento = municipiosDepartamentos[municipioId] || '';
+    $('#departamento_preview').val(departamento);
+  }
+
+  $('#id_municipio_notificacion').on('change', actualizarDepartamento);
+
+  // Trigger inicial para mostrar departamento si ya hay municipio seleccionado
+  actualizarDepartamento();
+
+  // =====================
+  // DV solo si NIT
+  // =====================
+  function toggleDV() {
+    const tipoDoc = $('#id_tipo_documento').val();
+    if (tipoDoc === 'NIT') {
+      $('#dv_wrap').show();
+    } else {
+      $('#dv_wrap').hide();
+      $('#id_dv').val('');
+    }
+  }
+
+  $('#id_tipo_documento').on('change', toggleDV);
+  toggleDV();
+
+  // =====================
+  // Cuál documento si OTRO
+  // =====================
+  function toggleCualDocumento() {
+    const tipoDoc = $('#id_tipo_documento').val();
+    if (tipoDoc === 'OTRO') {
+      $('#cual_documento_wrap').show();
+    } else {
+      $('#cual_documento_wrap').hide();
+      $('#id_cual_documento').val('');
+    }
+  }
+
+  $('#id_tipo_documento').on('change', toggleCualDocumento);
+  toggleCualDocumento();
+
+  // =====================
+  // Tipo jurídica si JURIDICA
+  // =====================
+  function toggleTipoJuridica() {
+    const tipoPers = $('#id_tipo_persona').val();
+    if (tipoPers === 'JURIDICA') {
+      $('#bloque-juridica').show();
+    } else {
+      $('#bloque-juridica').hide();
+      $('#id_tipo_juridica').val('');
+      $('#bloque-otro').hide();
+      $('#id_otro_tipo_juridica').val('');
+    }
+  }
+
+  $('#id_tipo_persona').on('change', toggleTipoJuridica);
+  toggleTipoJuridica();
+
+  // =====================
+  // Otro tipo jurídico si OTRO
+  // =====================
+  function toggleOtroTipoJuridica() {
+    const tipoJur = $('#id_tipo_juridica').val();
+    if (tipoJur === 'OTRO' && $('#id_tipo_persona').val() === 'JURIDICA') {
+      $('#bloque-otro').show();
+    } else {
+      $('#bloque-otro').hide();
+      $('#id_otro_tipo_juridica').val('');
+    }
+  }
+
+  $('#id_tipo_juridica').on('change', toggleOtroTipoJuridica);
+  toggleOtroTipoJuridica();
+
+  // =====================
+  // Otra clasificación si OTRA
+  // =====================
+  function toggleOtraClasificacion() {
+    if ($('#id_clasificacion_contribuyente').val() === 'OTRA') {
+      $('#bloque-otra-clasificacion').show();
+    } else {
+      $('#bloque-otra-clasificacion').hide();
+      $('#id_otra_clasificacion').val('');
+    }
+  }
+
+  $('#id_clasificacion_contribuyente').on('change', toggleOtraClasificacion);
+  toggleOtraClasificacion();
+
+  // =====================
+  // Cálculo automático de DV para NIT
+  // =====================
+  function calcularDV(nit) {
+    nit = nit.replace(/\D/g, '');
+    if (nit.length === 0) return '';
+
+    const primos = [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71];
+    let suma = 0;
+
+    for (let i = 0; i < nit.length; i++) {
+      suma += parseInt(nit[nit.length - 1 - i]) * primos[i];
+    }
+
+    const residuo = suma % 11;
+    if (residuo === 0) return '0';
+    if (residuo === 1) return '1';
+    return String(11 - residuo);
+  }
+
+  $('#id_numero_documento').on('input', function() {
+    const tipoDoc = $('#id_tipo_documento').val();
+    if (tipoDoc === 'NIT') {
+      const nit = $(this).val();
+      const dv = calcularDV(nit);
+      $('#id_dv').val(dv);
+    }
+  });
+
+  // =====================
+  // Solo números en teléfono
+  // =====================
+  $('#id_telefono').on('input', function() {
+    this.value = this.value.replace(/\D/g, '').substring(0, 10);
+  });
+
+  // =====================
+  // Solo números en número de documento
+  // =====================
+  $('#id_numero_documento').on('input', function() {
+    this.value = this.value.replace(/\D/g, '');
+  });
+
+  // =====================
+  // Constructor estructurado de dirección
+  // =====================
+  function buildDireccion() {
+    const tipo   = $('#v_tipo').val()  || 'CLL';
+    const vnum   = $('#v_num').val().trim();
+    const vletra = $('#v_letra').val() || '';
+    const gtipo  = $('#g_tipo').val()  || 'CLL';
+    const gnum   = $('#g_num').val().trim();
+    const gletra = $('#g_letra').val() || '';
+    const pnum   = $('#p_num').val().trim();
+    const ctype  = $('#c_tipo').val()  || '';
+    const cnum   = $('#c_num').val().trim();
+
+    let dir = tipo;
+    if (vnum)   dir += ' ' + vnum;
+    if (vletra) dir += vletra;
+    dir += ' CON ' + gtipo;
+    if (gnum)   dir += ' ' + gnum;
+    if (gletra) dir += gletra;
+    if (pnum)   dir += ' - ' + pnum;
+    if (ctype && cnum) dir += ' ' + ctype + ' ' + cnum;
+    else if (ctype)    dir += ' ' + ctype;
+    else if (cnum)     dir += ' ' + cnum;
+
+    const result = dir.trim();
+    $('#id_direccion_notificacion').val(result);
+    $('#addr_preview').val(result);
+  }
+
+  $('#v_tipo, #v_letra, #g_tipo, #g_letra, #c_tipo').on('change', buildDireccion);
+  $('#v_num, #g_num, #p_num, #c_num').on('input', buildDireccion);
+  buildDireccion();
+
+  // =====================
+  // Pre-llenado desde QR de visita no atendida
+  // =====================
+  {% if prefill.ref %}
+  (function() {
+    const nombre = "{{ prefill.nombre|escapejs }}";
+    const dir    = "{{ prefill.dir|escapejs }}";
+    if (nombre) $('#id_nombre_razon_social').val(nombre);
+    if (dir) {
+      $('#id_direccion_notificacion').val(dir);
+      $('#addr_preview').val(dir);
+    }
+  })();
+  {% endif %}
+
+});
+</script>
+
+<style>
+  .card-header {
+    font-weight: bold;
+  }
+  .form-label {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+  }
+</style>
+
+{% endblock %}

@@ -1,0 +1,650 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-graph-up-arrow text-success"></i> Reportes y Estadisticas</h2>
+    <a href="{% url 'admin_panel' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Volver
+    </a>
+  </div>
+
+  <!-- Tarjetas de resumen -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card bg-primary text-white shadow">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="card-subtitle mb-1 text-white-50">Total RITs</h6>
+              <h2 class="card-title mb-0">{{ total_rits }}</h2>
+            </div>
+            <div class="display-4 opacity-50">
+              <i class="bi bi-file-earmark-text"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card bg-success text-white shadow">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="card-subtitle mb-1 text-white-50">Total Declaraciones ICA</h6>
+              <h2 class="card-title mb-0">{{ total_icas }}</h2>
+            </div>
+            <div class="display-4 opacity-50">
+              <i class="bi bi-calculator"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-warning text-dark shadow">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="card-subtitle mb-1">Recaudo Total ICA</h6>
+              <h2 class="card-title mb-0">${{ total_recaudo_ica|floatformat:0|default:"0" }}</h2>
+            </div>
+            <div class="display-4 opacity-50">
+              <i class="bi bi-cash-stack"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-white shadow" style="background-color:#e67e22;">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="card-subtitle mb-1 text-white-50">Declaraciones AUTO</h6>
+              <h2 class="card-title mb-0">{{ total_autos }}</h2>
+              <small class="text-white-50">Recaudo: ${{ total_recaudo_auto|floatformat:0|default:"0" }}</small>
+            </div>
+            <div class="display-4 opacity-50">
+              <i class="bi bi-receipt"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estadisticas por tipo -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-primary text-white">
+          <i class="bi bi-pie-chart"></i> RITs por Tipo de Operacion
+        </div>
+        <div class="card-body">
+          {% if rits_por_operacion %}
+            <div class="row text-center">
+              {% for item in rits_por_operacion %}
+                <div class="col-4">
+                  <div class="p-3 rounded {% if item.opcion_uso == 'INSCRIPCION' %}bg-success bg-opacity-10{% elif item.opcion_uso == 'ACTUALIZACION' %}bg-primary bg-opacity-10{% else %}bg-danger bg-opacity-10{% endif %}">
+                    <h3 class="mb-1">{{ item.total }}</h3>
+                    <small class="text-muted">
+                      {% if item.opcion_uso == 'INSCRIPCION' %}Inscripciones
+                      {% elif item.opcion_uso == 'ACTUALIZACION' %}Actualizaciones
+                      {% else %}Cancelaciones{% endif %}
+                    </small>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-muted text-center mb-0">No hay datos disponibles</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-success text-white">
+          <i class="bi bi-pie-chart"></i> ICA por Tipo de Declaracion
+        </div>
+        <div class="card-body">
+          {% if icas_por_tipo %}
+            <div class="row text-center">
+              {% for item in icas_por_tipo %}
+                <div class="col-6">
+                  <div class="p-3 rounded {% if item.opcion_uso == 'INICIAL' %}bg-success bg-opacity-10{% else %}bg-warning bg-opacity-10{% endif %}">
+                    <h3 class="mb-1">{{ item.total }}</h3>
+                    <small class="text-muted">
+                      {% if item.opcion_uso == 'INICIAL' %}Iniciales{% else %}Correcciones{% endif %}
+                    </small>
+                    <div class="small text-success mt-1">${{ item.recaudo|floatformat:0|default:"0" }}</div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-muted text-center mb-0">No hay datos disponibles</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-header text-white" style="background-color:#e67e22;">
+          <i class="bi bi-pie-chart"></i> AUTO por Tipo de Declaracion
+        </div>
+        <div class="card-body">
+          {% if autos_por_tipo %}
+            <div class="row text-center">
+              {% for item in autos_por_tipo %}
+                <div class="col-6">
+                  <div class="p-3 rounded {% if item.opcion_uso == 'INICIAL' %}bg-success bg-opacity-10{% else %}bg-warning bg-opacity-10{% endif %}">
+                    <h3 class="mb-1">{{ item.total }}</h3>
+                    <small class="text-muted">
+                      {% if item.opcion_uso == 'INICIAL' %}Iniciales{% else %}Correcciones{% endif %}
+                    </small>
+                    <div class="small text-success mt-1">${{ item.recaudo|floatformat:0|default:"0" }}</div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-muted text-center mb-0">No hay datos disponibles</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros de busqueda -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-dark text-white">
+      <i class="bi bi-funnel"></i> Filtros de Busqueda
+    </div>
+    <div class="card-body">
+      <form method="get" class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label">Tipo de proceso</label>
+          <select name="tipo" class="form-select">
+            <option value="">Todos</option>
+            <option value="RIT"  {% if filtro_tipo == 'RIT'  %}selected{% endif %}>Solo RIT</option>
+            <option value="ICA"  {% if filtro_tipo == 'ICA'  %}selected{% endif %}>Solo ICA</option>
+            <option value="AUTO" {% if filtro_tipo == 'AUTO' %}selected{% endif %}>Solo Autorreteción</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Año</label>
+          <select name="anio" class="form-select">
+            <option value="">Todos</option>
+            {% for anio in anios_disponibles %}
+              <option value="{{ anio }}" {% if filtro_anio == anio|stringformat:"s" %}selected{% endif %}>{{ anio }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Mes</label>
+          <select name="mes" class="form-select">
+            <option value="">Todos</option>
+            <option value="1" {% if filtro_mes == '1' %}selected{% endif %}>Enero</option>
+            <option value="2" {% if filtro_mes == '2' %}selected{% endif %}>Febrero</option>
+            <option value="3" {% if filtro_mes == '3' %}selected{% endif %}>Marzo</option>
+            <option value="4" {% if filtro_mes == '4' %}selected{% endif %}>Abril</option>
+            <option value="5" {% if filtro_mes == '5' %}selected{% endif %}>Mayo</option>
+            <option value="6" {% if filtro_mes == '6' %}selected{% endif %}>Junio</option>
+            <option value="7" {% if filtro_mes == '7' %}selected{% endif %}>Julio</option>
+            <option value="8" {% if filtro_mes == '8' %}selected{% endif %}>Agosto</option>
+            <option value="9" {% if filtro_mes == '9' %}selected{% endif %}>Septiembre</option>
+            <option value="10" {% if filtro_mes == '10' %}selected{% endif %}>Octubre</option>
+            <option value="11" {% if filtro_mes == '11' %}selected{% endif %}>Noviembre</option>
+            <option value="12" {% if filtro_mes == '12' %}selected{% endif %}>Diciembre</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Documento</label>
+          <input type="text" name="documento" class="form-control" value="{{ filtro_documento }}" placeholder="Numero de documento">
+        </div>
+        <div class="col-md-2 d-flex align-items-end gap-2">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-search"></i> Buscar
+          </button>
+          <a href="{% url 'admin_reportes' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-x-circle"></i>
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tablas de datos con DataTables -->
+  <div class="row g-4">
+    <!-- Tabla RITs -->
+    {% if rits %}
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span><i class="bi bi-file-earmark-text"></i> Registros RIT ({{ rits|length }})</span>
+          <div class="btn-group">
+            <button class="btn btn-sm btn-light" type="button" data-bs-toggle="modal" data-bs-target="#modalColumnasRIT">
+              <i class="bi bi-columns-gap"></i> Columnas
+            </button>
+            <a href="{% url 'exportar_excel_rit' %}" class="btn btn-sm btn-success">
+              <i class="bi bi-file-earmark-excel"></i> Excel
+            </a>
+            <a href="{% url 'exportar_csv_rit' %}" class="btn btn-sm btn-info text-white">
+              <i class="bi bi-filetype-csv"></i> CSV
+            </a>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0 datatable" id="tabla-rits">
+              <thead class="table-light">
+                <tr>
+                  <th data-col="radicado">Radicado</th>
+                  <th data-col="fecha">Fecha</th>
+                  <th data-col="documento">Documento</th>
+                  <th data-col="contribuyente">Contribuyente</th>
+                  <th data-col="municipio">Municipio</th>
+                  <th data-col="operacion">Operacion</th>
+                  <th data-col="estado">Estado</th>
+                  <th data-col="clase">Clase</th>
+                  <th data-col="retenedor">Retenedor</th>
+                  <th data-col="establecimientos">N° Estab.</th>
+                  <th data-col="usuario">Usuario</th>
+                  <th data-col="acciones">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for rit in rits %}
+                <tr>
+                  <td><code>{{ rit.radicado|default:"-" }}</code></td>
+                  <td>{{ rit.fecha|date:"Y-m-d" }}</td>
+                  <td>{{ rit.tipo_documento }} {{ rit.numero_documento }}</td>
+                  <td>{{ rit.nombre_razon_social|truncatechars:25 }}</td>
+                  <td>{{ rit.municipio_notificacion|default:"-" }}</td>
+                  <td>
+                    <span class="badge {% if rit.opcion_uso == 'INSCRIPCION' %}bg-success{% elif rit.opcion_uso == 'ACTUALIZACION' %}bg-primary{% else %}bg-danger{% endif %}">
+                      {{ rit.get_opcion_uso_display }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="badge {% if rit.estado == 'ACTIVO' %}bg-success{% else %}bg-secondary{% endif %}">
+                      {{ rit.get_estado_display }}
+                    </span>
+                  </td>
+                  <td>{{ rit.get_clase_contribuyente_display }}</td>
+                  <td>{% if rit.es_retenedor_ica %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-x-circle text-muted"></i>{% endif %}</td>
+                  <td>{{ rit.numero_establecimientos }}</td>
+                  <td>{{ rit.user.username }}</td>
+                  <td>
+                    <a href="{% url 'pdf_rit' rit.id %}" class="btn btn-sm btn-outline-danger" title="Descargar PDF">
+                      <i class="bi bi-file-pdf"></i>
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Tabla ICAs -->
+    {% if icas %}
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span><i class="bi bi-calculator"></i> Declaraciones ICA ({{ icas|length }})</span>
+          <div class="btn-group">
+            <button class="btn btn-sm btn-light" type="button" data-bs-toggle="modal" data-bs-target="#modalColumnasICA">
+              <i class="bi bi-columns-gap"></i> Columnas
+            </button>
+            <a href="{% url 'exportar_excel_ica' %}" class="btn btn-sm btn-success">
+              <i class="bi bi-file-earmark-excel"></i> Excel
+            </a>
+            <a href="{% url 'exportar_csv_ica' %}" class="btn btn-sm btn-info text-white">
+              <i class="bi bi-filetype-csv"></i> CSV
+            </a>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0 datatable" id="tabla-icas">
+              <thead class="table-light">
+                <tr>
+                  <th data-col="id">ID</th>
+                  <th data-col="fecha">Fecha</th>
+                  <th data-col="anio">Año</th>
+                  <th data-col="documento">Documento</th>
+                  <th data-col="contribuyente">Contribuyente</th>
+                  <th data-col="municipio">Municipio</th>
+                  <th data-col="ingresos">Total Ingresos</th>
+                  <th data-col="valor_ica">Valor ICA</th>
+                  <th data-col="avisos">Avisos</th>
+                  <th data-col="sobretasa">Sobretasa</th>
+                  <th data-col="total">Total Pagar</th>
+                  <th data-col="tipo">Tipo</th>
+                  <th data-col="usuario">Usuario</th>
+                  <th data-col="acciones">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for ica in icas %}
+                <tr>
+                  <td><code>{{ ica.id }}</code></td>
+                  <td>{{ ica.fecha_diligenciamiento|date:"Y-m-d" }}</td>
+                  <td>{{ ica.anio_gravable }}</td>
+                  <td>{{ ica.tipo_documento }} {{ ica.numero_documento }}</td>
+                  <td>{{ ica.nombre_razon_social|truncatechars:25 }}</td>
+                  <td>{{ ica.municipio.nombre|default:"-" }}</td>
+                  <td class="text-end">${{ ica.b8_total_ingresos_pais|floatformat:0 }}</td>
+                  <td class="text-end">${{ ica.valor_ica|floatformat:0 }}</td>
+                  <td class="text-end">${{ ica.avisos_tableros|floatformat:0 }}</td>
+                  <td class="text-end">${{ ica.sobretasa_bomberil|floatformat:0 }}</td>
+                  <td class="text-end fw-bold text-success">${{ ica.total_a_pagar|floatformat:0 }}</td>
+                  <td>
+                    <span class="badge {% if ica.opcion_uso == 'INICIAL' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                      {{ ica.get_opcion_uso_display }}
+                    </span>
+                  </td>
+                  <td>{{ ica.user.username }}</td>
+                  <td>
+                    {% if ica.firma_otp_verificada %}
+                      <button onclick="previewPDF('{% url 'pdf_ica' ica.id %}')" class="btn btn-sm btn-outline-danger" title="Ver PDF">
+                        <i class="bi bi-file-pdf"></i>
+                      </button>
+                    {% else %}
+                      <span class="badge bg-warning text-dark">Pendiente firma</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Tabla AUTO -->
+    {% if autos %}
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header text-white d-flex justify-content-between align-items-center flex-wrap gap-2" style="background-color:#e67e22;">
+          <span><i class="bi bi-receipt"></i> Declaraciones Autorreteción ({{ autos|length }})</span>
+          <div class="btn-group">
+            <button class="btn btn-sm btn-light" type="button" data-bs-toggle="modal" data-bs-target="#modalColumnasAUTO">
+              <i class="bi bi-columns-gap"></i> Columnas
+            </button>
+            <a href="{% url 'exportar_excel_auto' %}" class="btn btn-sm btn-success">
+              <i class="bi bi-file-earmark-excel"></i> Excel
+            </a>
+            <a href="{% url 'exportar_csv_auto' %}" class="btn btn-sm btn-info text-white">
+              <i class="bi bi-filetype-csv"></i> CSV
+            </a>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0 datatable" id="tabla-autos">
+              <thead class="table-light">
+                <tr>
+                  <th data-col="id">ID</th>
+                  <th data-col="fecha">Fecha</th>
+                  <th data-col="anio">Año</th>
+                  <th data-col="bimestre">Bimestre</th>
+                  <th data-col="documento">Documento</th>
+                  <th data-col="contribuyente">Contribuyente</th>
+                  <th data-col="municipio">Municipio</th>
+                  <th data-col="total_auto">Total Autorretención</th>
+                  <th data-col="total">Total Pagar</th>
+                  <th data-col="tipo">Tipo</th>
+                  <th data-col="usuario">Usuario</th>
+                  <th data-col="acciones">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for auto in autos %}
+                <tr>
+                  <td><code>{{ auto.id }}</code></td>
+                  <td>{{ auto.fecha_diligenciamiento|date:"Y-m-d" }}</td>
+                  <td>{{ auto.anio_gravable }}</td>
+                  <td>{{ auto.get_bimestre_display }}</td>
+                  <td>{{ auto.tipo_documento }} {{ auto.numero_documento }}</td>
+                  <td>{{ auto.nombre_razon_social|truncatechars:25 }}</td>
+                  <td>{{ auto.municipio.nombre|default:"-" }}</td>
+                  <td class="text-end">${{ auto.total_valor_autorretencion|floatformat:0 }}</td>
+                  <td class="text-end fw-bold" style="color:#e67e22;">${{ auto.total_a_pagar|floatformat:0 }}</td>
+                  <td>
+                    <span class="badge {% if auto.opcion_uso == 'INICIAL' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                      {{ auto.get_opcion_uso_display }}
+                    </span>
+                  </td>
+                  <td>{{ auto.user.username }}</td>
+                  <td>
+                    {% if auto.firma_otp_verificada %}
+                      <a href="{% url 'pdf_auto' auto.id %}" class="btn btn-sm btn-outline-danger" title="Ver PDF" target="_blank">
+                        <i class="bi bi-file-pdf"></i>
+                      </a>
+                    {% else %}
+                      <span class="badge bg-warning text-dark">Pendiente firma</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if not rits and not icas and not autos %}
+    <div class="col-12">
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> No se encontraron registros con los filtros aplicados.
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal selector columnas RIT -->
+<div class="modal fade" id="modalColumnasRIT" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="bi bi-columns-gap"></i> Columnas RIT</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">Selecciona las columnas que deseas mostrar:</p>
+        <div class="row g-2" id="checkboxes-rit">
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-rit" data-col="0" checked> Radicado</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-rit" data-col="1" checked> Fecha</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-rit" data-col="2" checked> Documento</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-rit" data-col="3" checked> Contribuyente</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-rit" data-col="4" checked> Municipio</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-rit" data-col="5" checked> Operacion</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-rit" data-col="6" checked> Estado</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-rit" data-col="7"> Clase</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-rit" data-col="8"> Retenedor</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-rit" data-col="9"> N° Estab.</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-rit" data-col="10" checked> Usuario</label></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal selector columnas ICA -->
+<div class="modal fade" id="modalColumnasICA" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title"><i class="bi bi-columns-gap"></i> Columnas ICA</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">Selecciona las columnas que deseas mostrar:</p>
+        <div class="row g-2" id="checkboxes-ica">
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-ica" data-col="0" checked> ID</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-ica" data-col="1" checked> Fecha</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-ica" data-col="2" checked> Año</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-ica" data-col="3" checked> Documento</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-ica" data-col="4" checked> Contribuyente</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-ica" data-col="5" checked> Municipio</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-ica" data-col="6"> Total Ingresos</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-ica" data-col="7"> Valor ICA</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-ica" data-col="8"> Avisos</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-ica" data-col="9"> Sobretasa</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-ica" data-col="10" checked> Total Pagar</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-ica" data-col="11" checked> Tipo</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-ica" data-col="12" checked> Usuario</label></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal selector columnas AUTO -->
+<div class="modal fade" id="modalColumnasAUTO" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header text-white" style="background-color:#e67e22;">
+        <h5 class="modal-title"><i class="bi bi-columns-gap"></i> Columnas AUTO</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">Selecciona las columnas que deseas mostrar:</p>
+        <div class="row g-2" id="checkboxes-auto">
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-auto" data-col="0" checked> ID</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-auto" data-col="1" checked> Fecha</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-auto" data-col="2" checked> Año</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-auto" data-col="3" checked> Bimestre</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-auto" data-col="4" checked> Documento</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-auto" data-col="5" checked> Contribuyente</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-auto" data-col="6" checked> Municipio</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-auto" data-col="7"> Total Autorretención</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-auto" data-col="8" checked> Total Pagar</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-auto" data-col="9" checked> Tipo</label></div>
+          <div class="col-6"><label><input type="checkbox" class="form-check-input col-toggle-auto" data-col="10" checked> Usuario</label></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DataTables CSS y JS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+<script>
+$(document).ready(function() {
+  // Inicializar DataTables con ordenamiento, busqueda y paginacion
+  var tablaRIT = null;
+  var tablaICA = null;
+
+  if ($('#tabla-rits').length) {
+    tablaRIT = $('#tabla-rits').DataTable({
+      language: {
+        url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json',
+      },
+      pageLength: 25,
+      lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]],
+      order: [[1, 'desc']], // Ordenar por fecha descendente
+      columnDefs: [
+        { orderable: false, targets: -1 } // Ultima columna (acciones) no ordenable
+      ]
+    });
+
+    // Ocultar columnas inicialmente no marcadas
+    $('.col-toggle-rit').each(function() {
+      var col = $(this).data('col');
+      if (!$(this).is(':checked')) {
+        tablaRIT.column(col).visible(false);
+      }
+    });
+
+    // Toggle columnas RIT
+    $('.col-toggle-rit').on('change', function() {
+      var col = $(this).data('col');
+      tablaRIT.column(col).visible($(this).is(':checked'));
+    });
+  }
+
+  if ($('#tabla-icas').length) {
+    tablaICA = $('#tabla-icas').DataTable({
+      language: {
+        url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json',
+      },
+      pageLength: 25,
+      lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]],
+      order: [[1, 'desc']],
+      columnDefs: [{ orderable: false, targets: -1 }]
+    });
+    $('.col-toggle-ica').each(function() {
+      if (!$(this).is(':checked')) tablaICA.column($(this).data('col')).visible(false);
+    });
+    $('.col-toggle-ica').on('change', function() {
+      tablaICA.column($(this).data('col')).visible($(this).is(':checked'));
+    });
+  }
+
+  if ($('#tabla-autos').length) {
+    var tablaAUTO = $('#tabla-autos').DataTable({
+      language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json' },
+      pageLength: 25,
+      lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]],
+      order: [[1, 'desc']],
+      columnDefs: [{ orderable: false, targets: -1 }]
+    });
+    $('.col-toggle-auto').each(function() {
+      if (!$(this).is(':checked')) tablaAUTO.column($(this).data('col')).visible(false);
+    });
+    $('.col-toggle-auto').on('change', function() {
+      tablaAUTO.column($(this).data('col')).visible($(this).is(':checked'));
+    });
+  }
+});
+</script>
+
+<style>
+.dataTables_wrapper .dataTables_filter input {
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  padding: 0.375rem 0.75rem;
+}
+.dataTables_wrapper .dataTables_length select {
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  padding: 0.375rem 2rem 0.375rem 0.75rem;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button.current {
+  background: #0d6efd !important;
+  border-color: #0d6efd !important;
+  color: white !important;
+}
+#checkboxes-rit label, #checkboxes-ica label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+</style>
+{% endblock %}

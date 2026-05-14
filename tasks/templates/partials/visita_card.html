@@ -1,0 +1,62 @@
+<div class="col-12 col-md-6 col-lg-4">
+  <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid {{ color }} !important;">
+    <div class="card-body pb-2">
+      <div class="d-flex align-items-start gap-3">
+        <!-- Ícono estado -->
+        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+             style="width:42px;height:42px;background:{{ bg }};">
+          <i class="bi {{ icon }}" style="color:{{ color }};font-size:1.2rem;"></i>
+        </div>
+        <div class="flex-fill min-w-0">
+          <div class="fw-bold text-truncate" style="font-size:.95rem;color:#111;">
+            {{ v.nombre_establecimiento }}
+          </div>
+          <div class="text-muted" style="font-size:.8rem;">{{ v.direccion|truncatechars:50 }}</div>
+          <div class="text-muted" style="font-size:.78rem;">
+            <i class="bi bi-calendar2 me-1"></i>{{ v.fecha_visita|date:"d M Y H:i" }}
+          </div>
+          {% if v.municipio %}
+          <div class="text-muted" style="font-size:.78rem;">
+            <i class="bi bi-geo-alt me-1"></i>{{ v.municipio }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Chip estado -->
+      <div class="mt-2 d-flex align-items-center justify-content-between flex-wrap gap-1">
+        <span class="badge rounded-pill px-2 py-1"
+              style="background:{{ chip_bg }};color:{{ chip_color }};font-size:.75rem;font-weight:600;">
+          {{ chip }}
+        </span>
+        {% if v.fotos.count %}
+        <span class="text-muted" style="font-size:.78rem;">
+          <i class="bi bi-images me-1"></i>{{ v.fotos.count }} foto{{ v.fotos.count|pluralize }}
+        </span>
+        {% endif %}
+      </div>
+
+      {% if v.estado == 'no_atendida' and v.motivo_no_atencion %}
+      <div class="mt-1" style="font-size:.78rem;color:#DC0B2C;">
+        <i class="bi bi-exclamation-circle me-1"></i>{{ v.get_motivo_no_atencion_display }}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Botones acción -->
+    <div class="card-footer bg-transparent border-0 pt-0 pb-3 px-3 d-flex gap-2 flex-wrap">
+      {% if v.estado != 'pendiente' and v.estado != 'incompleta' %}
+        <button onclick="previewPDF('{% url 'pdf_visita_movil' v.id %}')"
+                class="btn btn-sm btn-outline-danger">
+          <i class="bi bi-file-pdf me-1"></i>Acta PDF
+        </button>
+      {% endif %}
+      {% if v.latitud and v.longitud %}
+        <a href="https://www.google.com/maps?q={{ v.latitud|stringformat:'.7f' }},{{ v.longitud|stringformat:'.7f' }}&z=17"
+           target="_blank" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-pin-map me-1"></i>Ver mapa
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>

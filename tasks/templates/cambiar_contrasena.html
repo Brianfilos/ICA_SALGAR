@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-5">
+
+      <div class="card shadow">
+        <div class="card-header bg-dark text-white text-center">
+          <h5 class="mb-0">CAMBIAR CONTRASEÑA</h5>
+        </div>
+        <div class="card-body p-4">
+
+          <p class="text-muted mb-4 text-center">
+            Por seguridad, debes establecer una nueva contraseña antes de continuar.
+          </p>
+
+          {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+          {% endif %}
+
+          <form method="post" novalidate>
+            {% csrf_token %}
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">Nueva contraseña *</label>
+              <div class="input-group">
+                <input
+                  type="password"
+                  id="nueva_contrasena"
+                  name="nueva_contrasena"
+                  class="form-control"
+                  placeholder="Mínimo 8 caracteres"
+                  required
+                  autocomplete="new-password"
+                >
+                <button type="button" class="btn btn-outline-secondary" onclick="togglePass('nueva_contrasena','ojo1')">
+                  <i id="ojo1" class="bi bi-eye"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label class="form-label fw-bold">Confirmar nueva contraseña *</label>
+              <div class="input-group">
+                <input
+                  type="password"
+                  id="confirmar_contrasena"
+                  name="confirmar_contrasena"
+                  class="form-control"
+                  placeholder="Repite la contraseña"
+                  required
+                  autocomplete="new-password"
+                >
+                <button type="button" class="btn btn-outline-secondary" onclick="togglePass('confirmar_contrasena','ojo2')">
+                  <i id="ojo2" class="bi bi-eye"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="d-grid">
+              <button type="submit" class="btn btn-institucional btn-lg">
+                Guardar nueva contraseña
+              </button>
+            </div>
+
+          </form>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% block extra_js %}
+<script>
+function togglePass(inputId, iconId) {
+  const input = document.getElementById(inputId);
+  const icon  = document.getElementById(iconId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.classList.replace('bi-eye', 'bi-eye-slash');
+  } else {
+    input.type = 'password';
+    icon.classList.replace('bi-eye-slash', 'bi-eye');
+  }
+}
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-3">Procesos Completados</h2>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Animación de éxito si viene de crear -->
+  <div id="success-animation" class="text-center py-4" style="display: none;">
+    <div class="display-1 text-success mb-3">
+      <i class="bi bi-check-circle-fill"></i>
+    </div>
+    <h4 class="text-success">¡Proceso guardado exitosamente!</h4>
+  </div>
+
+  {% if puede_ver_todo %}
+    <!-- Filtros para ADMIN / REVISOR -->
+    <div class="card mb-3">
+      <div class="card-header bg-dark text-white">
+        <i class="bi bi-funnel"></i> Filtros de búsqueda
+      </div>
+      <div class="card-body">
+        <form method="get" class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Buscar por documento</label>
+            <input type="text" name="documento" class="form-control"
+                   value="{{ filtro_documento }}" placeholder="Número de documento">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Tipo de proceso</label>
+            <select name="proceso" class="form-select">
+              <option value="">Todos</option>
+              <option value="RIT"    {% if filtro_proceso == 'RIT'    %}selected{% endif %}>RIT (web)</option>
+              <option value="ICA"    {% if filtro_proceso == 'ICA'    %}selected{% endif %}>ICA</option>
+              <option value="AUTO"   {% if filtro_proceso == 'AUTO'   %}selected{% endif %}>AUTO</option>
+              <option value="VISITA" {% if filtro_proceso == 'VISITA' %}selected{% endif %}>Visita campo (móvil)</option>
+            </select>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary me-2">
+              <i class="bi bi-search"></i> Buscar
+            </button>
+            <a href="{% url 'tasks_completed' %}" class="btn btn-outline-secondary">
+              Limpiar
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {% if is_admin %}
+    <!-- Panel de exportación (solo ADMIN) -->
+    <div class="card mb-4 border-success">
+      <div class="card-header text-white" style="background-color:#4B5563;">
+        <i class="bi bi-download"></i> Exportar registros
+      </div>
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Desde</label>
+            <input type="date" id="exp_fecha_desde" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Hasta</label>
+            <input type="date" id="exp_fecha_hasta" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Descargar</label>
+            <div class="d-flex flex-wrap gap-2">
+              <button onclick="exportar('rit','csv')" class="btn btn-outline-primary">
+                <i class="bi bi-filetype-csv"></i> RIT CSV
+              </button>
+              <button onclick="exportar('rit','excel')" class="btn btn-primary">
+                <i class="bi bi-file-earmark-excel"></i> RIT Excel
+              </button>
+              <button onclick="exportar('ica','csv')" class="btn btn-outline-success">
+                <i class="bi bi-filetype-csv"></i> ICA CSV
+              </button>
+              <button onclick="exportar('ica','excel')" class="btn btn-success">
+                <i class="bi bi-file-earmark-excel"></i> ICA Excel
+              </button>
+            </div>
+            <small class="text-muted mt-1 d-block">Sin rango = exporta todo. Excel requiere openpyxl instalado en el servidor.</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  {% endif %}
+
+  <!-- Tabla de RITs -->
+  {% if rits %}
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-primary text-white">
+        <i class="bi bi-file-earmark-text"></i> Registros RIT
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Fecha</th>
+                <th>Documento</th>
+                <th>Nombre/Razón Social</th>
+                <th>Opción</th>
+                {% if puede_ver_todo %}<th>Usuario</th>{% endif %}
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for rit in rits %}
+                <tr>
+                  <td>{{ rit.fecha|date:"Y-m-d H:i" }}</td>
+                  <td>{{ rit.tipo_documento }} {{ rit.numero_documento }}</td>
+                  <td>{{ rit.nombre_razon_social }}</td>
+                  <td>
+                    <span class="badge {% if rit.opcion_uso == 'INSCRIPCION' %}bg-success{% elif rit.opcion_uso == 'ACTUALIZACION' %}bg-primary{% else %}bg-danger{% endif %}">
+                      {{ rit.get_opcion_uso_display }}
+                    </span>
+                  </td>
+                  {% if puede_ver_todo %}<td>{{ rit.user.username }}</td>{% endif %}
+                  <td>
+                    {% if rit.estado == 'PENDIENTE_FIRMA' and not rit.firma_otp_verificada %}
+                      <a href="{% url 'verificar_firma_rit' rit.id %}" class="btn btn-sm btn-warning fw-bold">
+                        <i class="bi bi-pen"></i> Completar firma
+                      </a>
+                    {% else %}
+                      <a href="{% url 'pdf_rit' rit.id %}?inline=1" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary" title="Ver PDF">
+                        <i class="bi bi-file-pdf"></i> PDF
+                      </a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Tabla de ICAs -->
+  {% if icas %}
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-success text-white">
+        <i class="bi bi-calculator"></i> Declaraciones ICA
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Fecha</th>
+                <th>Año Gravable</th>
+                <th>Documento</th>
+                <th>Municipio</th>
+                <th>Total a Pagar</th>
+                <th>Opción</th>
+                {% if puede_ver_todo %}<th>Usuario</th>{% endif %}
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ica in icas %}
+                <tr>
+                  <td>{{ ica.fecha_diligenciamiento|date:"Y-m-d H:i" }}</td>
+                  <td>{{ ica.anio_gravable }}</td>
+                  <td>{{ ica.tipo_documento }} {{ ica.numero_documento }}</td>
+                  <td>{{ ica.municipio.nombre }}</td>
+                  <td class="text-end">${{ ica.total_a_pagar|floatformat:0 }}</td>
+                  <td>
+                    <span class="badge {% if ica.opcion_uso == 'INICIAL' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                      {{ ica.get_opcion_uso_display }}
+                    </span>
+                  </td>
+                  {% if puede_ver_todo %}<td>{{ ica.user.username }}</td>{% endif %}
+                  <td>
+                    {% if ica.firma_otp_verificada %}
+                      <button onclick="previewPDF('{% url 'pdf_ica' ica.id %}')" class="btn btn-sm btn-outline-danger" title="Ver PDF">
+                        <i class="bi bi-file-pdf"></i> PDF
+                      </button>
+                    {% elif puede_ver_todo %}
+                      <span class="badge bg-warning text-dark">Pendiente firma</span>
+                    {% else %}
+                      <a href="{% url 'proceso_ica' %}?editar={{ ica.id }}" class="btn btn-sm btn-warning text-dark">
+                        <i class="bi bi-pencil-square"></i> Terminar declaración
+                      </a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Tabla de AUTOs -->
+  {% if autos %}
+    <div class="card shadow-sm mb-4">
+      <div class="card-header text-white" style="background-color:#5a2d82;">
+        <i class="bi bi-arrow-repeat"></i> Declaraciones Autorretención ICA (AUTO)
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Fecha</th>
+                <th>Año / Bimestre</th>
+                <th>Documento</th>
+                <th>Municipio</th>
+                <th>Total a Pagar</th>
+                <th>Opción</th>
+                {% if is_admin %}<th>Usuario</th>{% endif %}
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for auto in autos %}
+                <tr>
+                  <td>{{ auto.fecha_diligenciamiento|date:"Y-m-d H:i" }}</td>
+                  <td>{{ auto.anio_gravable }} / {{ auto.get_bimestre_display }}</td>
+                  <td>{{ auto.tipo_documento }} {{ auto.numero_documento }}</td>
+                  <td>{{ auto.municipio.nombre }}</td>
+                  <td class="text-end">${{ auto.total_a_pagar|floatformat:0 }}</td>
+                  <td>
+                    <span class="badge {% if auto.opcion_uso == 'INICIAL' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                      {{ auto.get_opcion_uso_display }}
+                    </span>
+                  </td>
+                  {% if puede_ver_todo %}<td>{{ auto.user.username }}</td>{% endif %}
+                  <td>
+                    {% if auto.firma_otp_verificada %}
+                      <button onclick="previewPDF('{% url 'pdf_auto' auto.id %}')" class="btn btn-sm btn-outline-danger" title="Ver PDF">
+                        <i class="bi bi-file-pdf"></i> PDF
+                      </button>
+                    {% elif puede_ver_todo %}
+                      <span class="badge bg-warning text-dark">Pendiente firma</span>
+                    {% else %}
+                      <a href="{% url 'proceso_auto' %}?editar={{ auto.id }}" class="btn btn-sm btn-warning text-dark">
+                        <i class="bi bi-pencil-square"></i> Terminar declaración
+                      </a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Tabla de Visitas RIT Móvil (solo para funcionarios/admin, no para contribuyentes) -->
+  {% if visitas and not es_contribuyente %}
+    <div class="card shadow-sm mb-4">
+      <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color:#0d6efd;">
+        <span><i class="bi bi-phone"></i> Visitas de Campo — App Móvil</span>
+        <a href="{% url 'exportar_visitas_excel' %}" class="btn btn-sm btn-light">
+          <i class="bi bi-file-earmark-excel"></i> Descargar Reporte
+        </a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Fecha visita</th>
+                <th>Documento</th>
+                <th>Nombre / Establecimiento</th>
+                <th>Municipio</th>
+                <th>Actividad</th>
+                {% if not es_contribuyente %}<th>Funcionario</th>{% endif %}
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for v in visitas %}
+                <tr>
+                  <td>{{ v.fecha_visita|date:"Y-m-d H:i" }}</td>
+                  <td>{{ v.tipo_documento }} {{ v.numero_documento }}</td>
+                  <td>
+                    <div>{{ v.nombre_propietario }}</div>
+                    {% if v.nombre_establecimiento != v.nombre_propietario %}
+                      <small class="text-muted">{{ v.nombre_establecimiento }}</small>
+                    {% endif %}
+                  </td>
+                  <td>{{ v.municipio|default:"-" }}</td>
+                  <td><small>{{ v.actividad_economica }} {{ v.descripcion_actividad|truncatechars:40 }}</small></td>
+                  {% if not es_contribuyente %}<td>{{ v.funcionario.username }}</td>{% endif %}
+                  <td>
+                    {% if v.registro_rit %}
+                      <span class="badge {% if v.registro_rit.estado == 'ACTIVO' %}bg-success{% else %}bg-danger{% endif %}">
+                        RIT {{ v.registro_rit.get_opcion_uso_display }}
+                      </span>
+                    {% else %}
+                      <span class="badge {% if v.estado == 'sincronizado' %}bg-success{% elif v.estado == 'no_atendida' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                        {{ v.get_estado_display }}
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if v.registro_rit %}
+                      <!-- Visita atendida con RIT homologado -->
+                      <button onclick="previewPDF('{% url 'pdf_rit' v.registro_rit.id %}')"
+                              class="btn btn-sm btn-outline-primary mb-1" title="Ver PDF del Formulario RIT">
+                        <i class="bi bi-file-earmark-text"></i> PDF RIT
+                      </button>
+                      {% if es_contribuyente %}
+                        {% if v.registro_rit.estado == 'ACTIVO' %}
+                          <a href="{% url 'proceso_rit' %}?opcion=ACTUALIZACION"
+                             class="btn btn-sm btn-warning mb-1" title="Actualizar RIT">
+                            <i class="bi bi-pencil-square"></i> Actualizar
+                          </a>
+                          <a href="{% url 'proceso_rit' %}?opcion=CANCELACION"
+                             class="btn btn-sm btn-outline-danger mb-1" title="Cancelar RIT">
+                            <i class="bi bi-x-circle"></i> Cancelar
+                          </a>
+                        {% else %}
+                          <a href="{% url 'proceso_rit' %}?opcion=INSCRIPCION"
+                             class="btn btn-sm btn-success mb-1" title="Nueva inscripción RIT">
+                            <i class="bi bi-plus-circle"></i> Nueva Inscripción
+                          </a>
+                        {% endif %}
+                      {% endif %}
+                    {% else %}
+                      <!-- Visita sin RIT homologado: mostrar formulario basado en la visita -->
+                      <a href="{% url 'pdf_formulario_rit_movil' v.id %}"
+                         class="btn btn-sm btn-outline-primary mb-1" title="Formulario RIT">
+                        <i class="bi bi-file-earmark-text"></i> Formulario RIT
+                      </a>
+                    {% endif %}
+                    {% if not es_contribuyente %}
+                      <!-- Acta de visita: solo para funcionario/admin/revisor -->
+                      <a href="{% url 'pdf_visita_movil' v.id %}"
+                         class="btn btn-sm btn-outline-danger mb-1" title="Acta de Visita PDF">
+                        <i class="bi bi-file-pdf"></i> Acta
+                      </a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if not rits and not icas and not autos and not visitas %}
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle"></i> No hay procesos completados todavía.
+    </div>
+  {% endif %}
+
+  <div class="mt-4">
+    <a href="{% url 'tasks' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Volver al Panel
+    </a>
+  </div>
+</div>
+
+<!-- Modal aviso de pago -->
+<div class="modal fade" id="modalAvisoPago" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header" style="background-color:#4B5563;">
+        <h5 class="modal-title text-white fw-bold">
+          <i class="bi bi-info-circle-fill me-2"></i>Información importante sobre el pago
+        </h5>
+      </div>
+      <div class="modal-body py-4 px-4 text-center">
+        <div class="mb-3" style="font-size:3rem; color:#4B5563;">
+          <i class="bi bi-envelope-check-fill"></i>
+        </div>
+        <p class="fs-6 fw-semibold mb-0">
+          Para realizar el pago del valor declarado, la administración municipal le enviará el documento de cobro
+          al correo electrónico suministrado, el cual se entiende como correo de notificación.
+        </p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button type="button" class="btn btn-success px-4 fw-bold" data-bs-dismiss="modal">Entendido</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Mostrar animación de éxito si hay mensaje de success
+document.addEventListener('DOMContentLoaded', function() {
+  const alerts = document.querySelectorAll('.alert-success');
+  if (alerts.length > 0) {
+    const animation = document.getElementById('success-animation');
+    animation.style.display = 'block';
+    setTimeout(() => {
+      animation.style.display = 'none';
+    }, 3000);
+  }
+
+  // Exportar con rango de fechas
+  window.exportar = function(proceso, formato) {
+    const desde = document.getElementById('exp_fecha_desde').value;
+    const hasta = document.getElementById('exp_fecha_hasta').value;
+    const urls = {
+      'rit-csv':   '{% url "exportar_csv_rit" %}',
+      'rit-excel': '{% url "exportar_excel_rit" %}',
+      'ica-csv':   '{% url "exportar_csv_ica" %}',
+      'ica-excel': '{% url "exportar_excel_ica" %}',
+    };
+    let url = urls[proceso + '-' + formato];
+    const params = new URLSearchParams();
+    if (desde) params.append('fecha_desde', desde);
+    if (hasta) params.append('fecha_hasta', hasta);
+    if (params.toString()) url += '?' + params.toString();
+    window.location.href = url;
+  };
+
+  // Mostrar modal de aviso de pago si viene de terminar firma ICA
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('aviso') === 'pago') {
+    const modal = new bootstrap.Modal(document.getElementById('modalAvisoPago'));
+    modal.show();
+    // Limpiar el parámetro de la URL sin recargar
+    history.replaceState(null, '', window.location.pathname);
+  }
+});
+</script>
+{% endblock %}
