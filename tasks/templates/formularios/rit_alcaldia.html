@@ -283,8 +283,7 @@
           <thead class="table-light">
             <tr>
               <th style="width:5%">#</th>
-              <th style="width:65%">Actividad Económica</th>
-              <th style="width:25%">Base Gravable Mensual</th>
+              <th style="width:90%">Actividad Económica</th>
               <th style="width:5%"></th>
             </tr>
           </thead>
@@ -295,10 +294,7 @@
                 <td>
                   {{ act_form.actividad }}
                   {% if act_form.actividad.errors %}<div class="text-danger small">{{ act_form.actividad.errors }}</div>{% endif %}
-                </td>
-                <td>
-                  {{ act_form.base_gravable_mensual }}
-                  {% if act_form.base_gravable_mensual.errors %}<div class="text-danger small">{{ act_form.base_gravable_mensual.errors }}</div>{% endif %}
+                  {{ act_form.base_gravable_mensual.as_hidden }}
                 </td>
                 <td class="text-center align-middle">
                   <button type="button" class="btn btn-sm btn-outline-danger remove-actividad">X</button>
