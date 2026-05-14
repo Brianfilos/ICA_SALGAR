@@ -10,12 +10,23 @@
   </h3>
 
   {% if error %}
-    <div class="alert alert-danger">{{ error }}</div>
+    <div class="alert alert-{{ ya_registrado|yesno:'warning,danger' }}">
+      {{ error }}
+      {% if ya_registrado %}
+        <div class="mt-2">
+          <a href="{% url 'recuperar_contrasena' %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-key me-1"></i>Recuperar contraseña
+          </a>
+        </div>
+      {% endif %}
+    </div>
   {% endif %}
 
+  {% if not ya_registrado %}
   <div class="alert alert-info">
     <strong>Nota:</strong> Tu usuario será tu correo electrónico. Se te enviará una contraseña temporal al correo que registres.
   </div>
+  {% endif %}
 
   {% if prefill.ref %}
   <div class="alert alert-success border-success">

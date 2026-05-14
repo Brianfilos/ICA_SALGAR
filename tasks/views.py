@@ -81,6 +81,9 @@ def is_revisor(user):
 def is_contribuyente(user):
     return user.is_authenticated and user.groups.filter(name="CONTRIBUYENTE").exists()
 
+def is_alcaldia_gestion(user):
+    return user.is_authenticated and user.groups.filter(name="ALCALDIA_GESTION").exists()
+
 def tiene_acceso(user, codigo):
     return AccesoProceso.objects.filter(
         user=user, habilitado=True, proceso__codigo=codigo, proceso__activo=True
@@ -233,7 +236,8 @@ def signup(request):
             return render(request, "signup.html", {
                 "perfil_form": perfil_form,
                 "municipios_json": municipios_json,
-                "error": "Ya existe una cuenta registrada con ese correo electrónico."
+                "ya_registrado": True,
+                "error": "Tu información ya fue registrada por la Alcaldía de Salgar. Para ingresar al portal, recupera tu contraseña.",
             })
 
         try:
@@ -295,7 +299,8 @@ def signup(request):
             return render(request, "signup.html", {
                 "perfil_form": perfil_form,
                 "municipios_json": municipios_json,
-                "error": "Ya existe una cuenta registrada con ese correo electrónico."
+                "ya_registrado": True,
+                "error": "Tu información ya fue registrada por la Alcaldía de Salgar. Para ingresar al portal, recupera tu contraseña.",
             })
 
     # Formulario no válido
@@ -661,6 +666,7 @@ def tasks(request):
         "estado_rit": estado_rit,
         "rit_activo": rit_activo,
         "rit_pendiente_panel": rit_pendiente_panel,
+        "es_alcaldia_gestion": is_alcaldia_gestion(request.user),
     })
 
 
@@ -1313,6 +1319,168 @@ def proceso_rit(request):
         "establecimientos_formset": establecimientos_formset,
         "actividades_formset": actividades_formset,
         "opcion_uso": opcion_uso,
+    })
+
+
+# ----------------------------
+# RIT — CARGA POR ALCALDÍA
+# ----------------------------
+
+@login_required
+def rit_alcaldia(request):
+    """Vista exclusiva para ALCALDIA_GESTION: crea RIT inicial para un contribuyente sin OTP."""
+    from .models import PerfilContribuyente
+    from catalogos.models import Municipio as _Municipio
+
+    if not is_alcaldia_gestion(request.user):
+        return redirect("tasks")
+
+    municipios_json = get_municipios_departamentos_json()
+
+    if request.method == "GET":
+        form = RITForm(initial={'opcion_uso': 'INSCRIPCION'}, perfil=None, opcion_uso='INSCRIPCION')
+        representantes_formset = RepresentanteLegalRITFormSet(prefix='representantes')
+        establecimientos_formset = EstablecimientoRITFormSet(prefix='establecimientos')
+        actividades_formset = ActividadEconomicaRITFormSet(prefix='actividades')
+        return render(request, "formularios/rit_alcaldia.html", {
+            "form": form,
+            "representantes_formset": representantes_formset,
+            "establecimientos_formset": establecimientos_formset,
+            "actividades_formset": actividades_formset,
+            "municipios_json": municipios_json,
+        })
+
+    # ---- POST ----
+    form = RITForm(request.POST, request.FILES, perfil=None, opcion_uso='INSCRIPCION')
+    representantes_formset = RepresentanteLegalRITFormSet(request.POST, prefix='representantes')
+    establecimientos_formset = EstablecimientoRITFormSet(request.POST, prefix='establecimientos')
+    actividades_formset = ActividadEconomicaRITFormSet(request.POST, prefix='actividades')
+
+    tiene_establecimientos = True
+    form_valido = form.is_valid()
+    if form_valido:
+        tiene_establecimientos = form.cleaned_data.get('tiene_establecimientos', True)
+    establecimientos_valido = establecimientos_formset.is_valid() if tiene_establecimientos else True
+
+    if (form_valido and representantes_formset.is_valid() and
+            establecimientos_valido and actividades_formset.is_valid()):
+
+        correo = form.cleaned_data.get('correo_electronico', '').strip().lower()
+
+        # 1. Buscar o crear el usuario contribuyente (sin enviar credenciales)
+        contribuyente_user = User.objects.filter(username=correo).first()
+        if not contribuyente_user:
+            temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+            contribuyente_user = User.objects.create_user(
+                username=correo,
+                password=temp_password,
+                email=correo,
+                first_name=form.cleaned_data.get('nombre_razon_social', ''),
+            )
+            try:
+                grupo = Group.objects.get(name='CONTRIBUYENTE')
+                contribuyente_user.groups.add(grupo)
+            except Group.DoesNotExist:
+                pass
+
+        # 2. Crear PerfilContribuyente si no existe
+        if not hasattr(contribuyente_user, 'perfil'):
+            mun = form.cleaned_data.get('municipio_notificacion')
+            try:
+                perfil_c = PerfilContribuyente(
+                    user=contribuyente_user,
+                    nombre_razon_social=form.cleaned_data.get('nombre_razon_social', correo),
+                    tipo_documento=form.cleaned_data.get('tipo_documento', 'CC'),
+                    numero_documento=form.cleaned_data.get('numero_documento', '0'),
+                    dv=form.cleaned_data.get('dv', ''),
+                    cual_documento=form.cleaned_data.get('cual_documento', ''),
+                    direccion_notificacion=form.cleaned_data.get('direccion_notificacion', '-'),
+                    municipio_notificacion=mun,
+                    telefono=form.cleaned_data.get('telefono', '-'),
+                    correo_electronico=correo,
+                    clasificacion_contribuyente='REGIMEN_COMUN',
+                    tipo_persona=form.cleaned_data.get('tipo_persona', 'NATURAL'),
+                    tipo_juridica=form.cleaned_data.get('tipo_juridica', ''),
+                    must_change_password=True,
+                )
+                perfil_c.asignar_departamento_notificacion()
+                perfil_c.save()
+            except Exception as exc:
+                logger.warning('[rit_alcaldia] No se pudo crear perfil para %s: %s', correo, exc)
+
+        # 3. Habilitar acceso RIT si no lo tiene
+        try:
+            proceso_rit_obj = Proceso.objects.get(codigo='RIT')
+            AccesoProceso.objects.get_or_create(
+                user=contribuyente_user,
+                proceso=proceso_rit_obj,
+                defaults={'habilitado': True}
+            )
+        except Proceso.DoesNotExist:
+            pass
+
+        # 4. Crear el RIT (save() lo pone en PENDIENTE_FIRMA, luego forzamos ACTIVO)
+        from django.utils import timezone as _tz
+        rit = form.save(commit=False)
+        rit.user = contribuyente_user
+        rit.radicado = RegistroRIT.generar_radicado()
+        rit.asignar_departamento_notificacion()
+
+        # 5. PDF físico adjunto
+        if request.FILES.get('pdf_fisico'):
+            rit.pdf_fisico = request.FILES['pdf_fisico']
+
+        rit.save()  # save() pone estado=PENDIENTE_FIRMA para registro nuevo
+
+        # Forzar ACTIVO saltando la máquina de estados del save()
+        now_ts = _tz.now()
+        RegistroRIT.objects.filter(pk=rit.pk).update(
+            estado='ACTIVO',
+            firma_otp_verificada=True,
+            firma_timestamp=now_ts,
+        )
+
+        # Guardar representantes
+        representantes = representantes_formset.save(commit=False)
+        for idx, rep in enumerate(representantes):
+            rep.rit = rit
+            rep.orden = idx + 1
+            rep.save()
+        for obj in representantes_formset.deleted_objects:
+            obj.delete()
+
+        # Guardar establecimientos
+        if rit.tiene_establecimientos:
+            establecimientos = establecimientos_formset.save(commit=False)
+            for idx, est in enumerate(establecimientos):
+                est.rit = rit
+                est.orden = idx + 1
+                est.save()
+            for obj in establecimientos_formset.deleted_objects:
+                obj.delete()
+
+        # Guardar actividades
+        actividades = actividades_formset.save(commit=False)
+        for idx, act in enumerate(actividades):
+            act.rit = rit
+            act.orden = idx + 1
+            act.save()
+        for obj in actividades_formset.deleted_objects:
+            obj.delete()
+
+        messages.success(
+            request,
+            f'RIT registrado exitosamente — Radicado: {rit.radicado} para {correo}.'
+        )
+        return redirect("rit_alcaldia")
+
+    messages.error(request, 'Por favor corrija los errores en el formulario.')
+    return render(request, "formularios/rit_alcaldia.html", {
+        "form": form,
+        "representantes_formset": representantes_formset,
+        "establecimientos_formset": establecimientos_formset,
+        "actividades_formset": actividades_formset,
+        "municipios_json": municipios_json,
     })
 
 

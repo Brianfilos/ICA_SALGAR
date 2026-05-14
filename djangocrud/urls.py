@@ -31,6 +31,7 @@ urlpatterns = [
     path('gestion/configuracion-pdf/', views.admin_config_pdf, name='admin_config_pdf'),
     path('gestion/reportes/', views.admin_reportes, name='admin_reportes'),
     path("proceso/RIT/", views.proceso_rit, name="proceso_rit"),
+    path("proceso/RIT/alcaldia/", views.rit_alcaldia, name="rit_alcaldia"),
     path("proceso/RIT/verificar-firma/<int:registro_id>/", views.verificar_firma_rit, name="verificar_firma_rit"),
     path("proceso/ICA/", views.proceso_ica, name="proceso_ica"),
     path("proceso/ICA/verificar-firma/<int:declaracion_id>/", views.verificar_firma_ica, name="verificar_firma_ica"),

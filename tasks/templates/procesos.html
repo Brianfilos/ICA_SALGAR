@@ -82,6 +82,17 @@
       Ver procesos completados
     </a>
   </div>
+
+  {% if es_alcaldia_gestion %}
+  <div class="mt-4 p-3 border rounded bg-light">
+    <h5 class="mb-2"><i class="bi bi-building-fill-gear me-2"></i>Panel Alcaldía — Carga masiva de RITs</h5>
+    <p class="text-muted small mb-2">Registra el RIT inicial de un contribuyente sin enviar credenciales. El contribuyente podrá recuperar su contraseña cuando ingrese al portal.</p>
+    <a href="{% url 'rit_alcaldia' %}" class="btn btn-primary">
+      <i class="bi bi-person-plus-fill me-1"></i>Registrar RIT de Contribuyente
+    </a>
+  </div>
+  {% endif %}
+
 </div>
 
 <!-- Modal para RIT (solo se muestra si tiene RIT activo) -->

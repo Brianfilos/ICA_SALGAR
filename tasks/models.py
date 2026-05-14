@@ -505,6 +505,17 @@ class RegistroRIT(models.Model):
     )
 
     # =========================
+    # PDF FÍSICO (carga por alcaldía)
+    # =========================
+    pdf_fisico = models.FileField(
+        upload_to='rit_fisicos/',
+        blank=True,
+        null=True,
+        verbose_name="PDF físico escaneado",
+        help_text="PDF del formulario RIT físico previamente firmado (solo alcaldía)"
+    )
+
+    # =========================
     # FIRMA ELECTRÓNICA OTP
     # =========================
     firma_otp_verificada = models.BooleanField(

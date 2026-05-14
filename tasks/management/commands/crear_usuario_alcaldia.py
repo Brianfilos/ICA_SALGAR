@@ -4,16 +4,16 @@ from tasks.models import AccesoProceso, Proceso
 
 
 class Command(BaseCommand):
-    help = 'Crea el usuario de gestión de la alcaldía con acceso especial a ICA'
+    help = 'Crea el usuario de gestión de la alcaldía con acceso a ICA y RIT'
 
     def handle(self, *args, **options):
-        email = 'legal.gestionbolivar@gmail.com'
-        password = 'Gestionbolivar2026*'
+        email = 'legal.gestionsalgar@gmail.com'
+        password = 'GestionSalgar2026*'
         username = email
 
         # Crear o actualizar grupo ALCALDIA_GESTION
         grupo, _ = Group.objects.get_or_create(name='ALCALDIA_GESTION')
-        self.stdout.write(f'Grupo ALCALDIA_GESTION: OK')
+        self.stdout.write('Grupo ALCALDIA_GESTION: OK')
 
         # Crear o actualizar usuario
         user, created = User.objects.get_or_create(
@@ -28,17 +28,18 @@ class Command(BaseCommand):
         # Asignar grupo
         user.groups.set([grupo])
 
-        # Habilitar acceso al proceso ICA
-        try:
-            proceso_ica = Proceso.objects.get(codigo='ICA')
-            AccesoProceso.objects.get_or_create(user=user, proceso=proceso_ica,
-                                                 defaults={'habilitado': True})
-            acceso = AccesoProceso.objects.get(user=user, proceso=proceso_ica)
-            acceso.habilitado = True
-            acceso.save()
-            self.stdout.write('Acceso ICA habilitado: OK')
-        except Exception as e:
-            self.stdout.write(f'Advertencia al habilitar acceso ICA: {e}')
+        # Habilitar acceso a ICA y RIT
+        for codigo in ('ICA', 'RIT'):
+            try:
+                proceso = Proceso.objects.get(codigo=codigo)
+                acceso, _ = AccesoProceso.objects.get_or_create(
+                    user=user, proceso=proceso, defaults={'habilitado': True}
+                )
+                acceso.habilitado = True
+                acceso.save()
+                self.stdout.write(f'Acceso {codigo} habilitado: OK')
+            except Exception as e:
+                self.stdout.write(f'Advertencia al habilitar acceso {codigo}: {e}')
 
         accion = 'Creado' if created else 'Actualizado'
         self.stdout.write(self.style.SUCCESS(

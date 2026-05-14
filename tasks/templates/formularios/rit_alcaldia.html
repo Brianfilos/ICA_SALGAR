@@ -1,0 +1,495 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <div class="alert alert-primary d-flex align-items-center gap-2 mb-3">
+    <i class="bi bi-building-fill-gear fs-3"></i>
+    <div>
+      <strong>CARGA DE RIT — ALCALDÍA DE SALGAR</strong><br>
+      <small>Complete el formulario con los datos del contribuyente. El RIT quedará registrado como <strong>ACTIVO</strong> inmediatamente. No se enviará ninguna credencial al contribuyente.</small>
+    </div>
+  </div>
+
+  <h3 class="text-center mb-1">REGISTRO DE INFORMACIÓN TRIBUTARIA</h3>
+  <p class="text-center text-muted mb-4">Municipio de Salgar — Secretaría de Hacienda</p>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  {% if form.errors or representantes_formset.errors or establecimientos_formset.errors or actividades_formset.errors %}
+    <div class="alert alert-danger">
+      <h6 class="fw-bold">Por favor corrija los siguientes errores:</h6>
+      {% if form.non_field_errors %}
+        <ul class="mb-1">{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if form.errors %}
+        <ul class="mb-1">
+          {% for field, errors in form.errors.items %}
+            {% if field != '__all__' %}<li><strong>{{ field }}:</strong> {{ errors|join:", " }}</li>{% endif %}
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" id="rit-form" action="{% url 'rit_alcaldia' %}">
+    {% csrf_token %}
+    {{ form.opcion_uso.as_hidden }}
+
+    <!-- SECCIÓN A: CLASIFICACIÓN -->
+    <div class="card mb-3">
+      <div class="card-header bg-primary text-white">
+        <strong>A. DATOS DE REGISTRO Y CLASIFICACIÓN DEL OBLIGADO</strong>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">1. Fecha</label>
+            <input type="text" class="form-control" readonly value="{% now 'd/m/Y' %}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">2. Tipo de contribuyente</label>
+            {{ form.clase_contribuyente }}
+            {% if form.clase_contribuyente.errors %}<div class="text-danger small">{{ form.clase_contribuyente.errors }}</div>{% endif %}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label d-block">3. Obligaciones</label>
+            <div class="form-check">
+              {{ form.es_retenedor_ica }}
+              <label class="form-check-label" for="id_es_retenedor_ica">Agente de Retención ICA</label>
+            </div>
+            <div class="form-check">
+              {{ form.es_autorretenedor_ica }}
+              <label class="form-check-label" for="id_es_autorretenedor_ica">Autorretenedor ICA</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN B: DATOS DEL CONTRIBUYENTE -->
+    <div class="card mb-3">
+      <div class="card-header bg-dark text-white">
+        <strong>B. DATOS DEL CONTRIBUYENTE O RESPONSABLE</strong>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">11. Tipo de persona</label>
+            {{ form.tipo_persona }}
+          </div>
+          <div class="col-md-4" id="bloque-juridica" style="display:none;">
+            <label class="form-label">Tipo jurídica</label>
+            {{ form.tipo_juridica }}
+          </div>
+          <div class="col-md-4" id="bloque-otro" style="display:none;">
+            <label class="form-label">Especifique el tipo jurídico</label>
+            {{ form.otro_tipo_juridica }}
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-3">
+            <label class="form-label">5. Tipo de documento</label>
+            {{ form.tipo_documento }}
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">No. documento</label>
+            {{ form.numero_documento }}
+          </div>
+          <div class="col-md-1" id="dv_wrap" style="display:none;">
+            <label class="form-label">DV</label>
+            {{ form.dv }}
+          </div>
+        </div>
+        <div class="row g-3 mt-1" id="cual_documento_wrap" style="display:none;">
+          <div class="col-md-6">
+            <label class="form-label">Especifique el tipo de documento</label>
+            {{ form.cual_documento }}
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-12">
+            <label class="form-label">6. NOMBRE COMPLETO / RAZÓN SOCIAL</label>
+            {{ form.nombre_razon_social }}
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-6">
+            <label class="form-label">7. Domicilio principal</label>
+            {{ form.direccion_notificacion }}
+            {% if form.direccion_notificacion.errors %}<div class="text-danger small">{{ form.direccion_notificacion.errors }}</div>{% endif %}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Municipio</label>
+            {{ form.municipio_notificacion }}
+            {% if form.municipio_notificacion.errors %}<div class="text-danger small">{{ form.municipio_notificacion.errors }}</div>{% endif %}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Departamento</label>
+            <input type="text" class="form-control" id="departamento_preview" readonly placeholder="Autocompletado">
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-4">
+            <label class="form-label">8. Teléfono</label>
+            {{ form.telefono }}
+            {% if form.telefono.errors %}<div class="text-danger small">{{ form.telefono.errors }}</div>{% endif %}
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">9. Correo electrónico <span class="text-danger">*</span></label>
+            {{ form.correo_electronico }}
+            {% if form.correo_electronico.errors %}<div class="text-danger small">{{ form.correo_electronico.errors }}</div>{% endif %}
+            <small class="text-muted">Este correo será el usuario del portal del contribuyente.</small>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">10. No. establecimientos</label>
+            {{ form.numero_establecimientos }}
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-4">
+            <label class="form-label">Fecha de inicio de actividades</label>
+            {{ form.fecha_inicio_actividades }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN C: REPRESENTANTES LEGALES -->
+    <div class="card mb-3">
+      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <strong>C. REPRESENTANTES LEGALES / SUPLENTES</strong>
+        <button type="button" class="btn btn-sm btn-light" id="add-representante">+ Agregar</button>
+      </div>
+      <div class="card-body">
+        {{ representantes_formset.management_form }}
+        <div id="representantes-container">
+          {% for rep_form in representantes_formset %}
+            <div class="representante-row border rounded p-3 mb-2 {% if rep_form.errors %}border-danger{% endif %}">
+              <div class="row g-2">
+                <div class="col-md-2">
+                  <label class="form-label small">Tipo representante</label>
+                  {{ rep_form.tipo_representante }}
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small">Nombre completo</label>
+                  {{ rep_form.nombre_completo }}
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small">Tipo documento</label>
+                  {{ rep_form.tipo_documento }}
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small">No. documento</label>
+                  {{ rep_form.numero_documento }}
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small">Correo</label>
+                  {{ rep_form.correo_electronico }}
+                </div>
+                <div class="col-md-1 text-end">
+                  <button type="button" class="btn btn-sm btn-outline-danger remove-representante">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+                {{ rep_form.orden }}{{ rep_form.id }}
+                {% if rep_form.instance.pk %}{{ rep_form.DELETE }}{% endif %}
+              </div>
+              {% if rep_form.errors %}<div class="text-danger small mt-1">{{ rep_form.errors }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- PREGUNTA: ESTABLECIMIENTOS -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <label class="form-label fw-semibold">¿Tiene establecimientos?</label>
+        <div class="form-check form-check-inline">
+          {{ form.tiene_establecimientos }}
+          <input class="form-check-input" type="radio" name="tiene_establecimientos_radio" id="tiene_est_si" value="true" checked>
+          <label class="form-check-label" for="tiene_est_si">Sí</label>
+        </div>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" name="tiene_establecimientos_radio" id="tiene_est_no" value="false">
+          <label class="form-check-label" for="tiene_est_no">No</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN D: ESTABLECIMIENTOS -->
+    <div class="card mb-3" id="seccion-establecimientos">
+      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <strong>D. ESTABLECIMIENTOS EN SALGAR</strong>
+        <button type="button" class="btn btn-sm btn-light" id="add-establecimiento">+ Agregar</button>
+      </div>
+      <div class="card-body">
+        {{ establecimientos_formset.management_form }}
+        <div id="establecimientos-container">
+          {% for est_form in establecimientos_formset %}
+            <div class="establecimiento-row border rounded p-3 mb-2 {% if est_form.errors %}border-danger{% endif %}">
+              <div class="row g-2">
+                <div class="col-md-3">
+                  <label class="form-label small">Nombre del establecimiento</label>
+                  {{ est_form.nombre }}
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small">Dirección</label>
+                  {{ est_form.direccion }}
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small">Teléfono</label>
+                  {{ est_form.telefono }}
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small">Fecha inicio act.</label>
+                  {{ est_form.fecha_inicio_actividades }}
+                </div>
+                <div class="col-md-1">
+                  <label class="form-label small d-block">Avisos</label>
+                  {{ est_form.tiene_avisos_tableros }}
+                </div>
+                <div class="col-md-1 text-end">
+                  <button type="button" class="btn btn-sm btn-outline-danger remove-establecimiento">X</button>
+                </div>
+                {{ est_form.orden }}{{ est_form.id }}
+                {% if est_form.instance.pk %}{{ est_form.DELETE }}{% endif %}
+              </div>
+              {% if est_form.errors %}<div class="text-danger small mt-1">{{ est_form.errors }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN E: ACTIVIDADES -->
+    <div class="card mb-3">
+      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <strong>E. ACTIVIDADES ECONÓMICAS</strong>
+        <button type="button" class="btn btn-sm btn-light" id="add-actividad">+ Agregar</button>
+      </div>
+      <div class="card-body">
+        {{ actividades_formset.management_form }}
+        <table class="table table-sm table-bordered">
+          <thead class="table-light">
+            <tr>
+              <th style="width:5%">#</th>
+              <th style="width:65%">Actividad Económica</th>
+              <th style="width:25%">Base Gravable Mensual</th>
+              <th style="width:5%"></th>
+            </tr>
+          </thead>
+          <tbody id="actividades-container">
+            {% for act_form in actividades_formset %}
+              <tr class="actividad-row {% if act_form.errors %}table-danger{% endif %}">
+                <td class="actividad-numero align-middle text-center">{{ forloop.counter }}</td>
+                <td>
+                  {{ act_form.actividad }}
+                  {% if act_form.actividad.errors %}<div class="text-danger small">{{ act_form.actividad.errors }}</div>{% endif %}
+                </td>
+                <td>
+                  {{ act_form.base_gravable_mensual }}
+                  {% if act_form.base_gravable_mensual.errors %}<div class="text-danger small">{{ act_form.base_gravable_mensual.errors }}</div>{% endif %}
+                </td>
+                <td class="text-center align-middle">
+                  <button type="button" class="btn btn-sm btn-outline-danger remove-actividad">X</button>
+                  {{ act_form.orden }}{{ act_form.id }}
+                  {% if act_form.instance.pk %}{{ act_form.DELETE }}{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SECCIÓN F: CARGA PDF FÍSICO -->
+    <div class="card mb-3 border-warning">
+      <div class="card-header bg-warning text-dark">
+        <strong><i class="bi bi-file-earmark-pdf me-2"></i>F. DOCUMENTO FÍSICO FIRMADO (OPCIONAL)</strong>
+      </div>
+      <div class="card-body">
+        <div class="row g-3 align-items-center">
+          <div class="col-md-8">
+            <label class="form-label">Adjuntar PDF del formulario RIT físico previamente firmado</label>
+            <input type="file" name="pdf_fisico" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+            <small class="text-muted">Formatos: PDF, JPG, PNG. Máximo 10 MB.</small>
+          </div>
+          <div class="col-md-4 text-center">
+            <div class="alert alert-info mb-0 py-2">
+              <i class="bi bi-info-circle me-1"></i>
+              El RIT se registrará como <strong>ACTIVO</strong> inmediatamente, sin requerir firma electrónica OTP.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTÓN REGISTRAR -->
+    <div class="d-grid gap-2 mb-4">
+      <button type="submit" class="btn btn-primary btn-lg" id="btn-registrar"
+              data-loading="true" data-loading-text="Registrando RIT...">
+        <i class="bi bi-person-check-fill me-2"></i>Registrar RIT del Contribuyente
+      </button>
+      <a href="{% url 'tasks' %}" class="btn btn-outline-secondary">Cancelar</a>
+    </div>
+
+  </form>
+</div>
+
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+$(document).ready(function() {
+
+  const municipios = {{ municipios_json|safe }};
+
+  $('#id_municipio_notificacion').select2({ theme: 'bootstrap-5', placeholder: 'Seleccione un municipio', allowClear: true, width: '100%' });
+  $('.actividad-select').select2({ theme: 'bootstrap-5', placeholder: 'Seleccione una actividad', allowClear: true, width: '100%' });
+
+  $('#id_municipio_notificacion').on('change', function() {
+    $('#departamento_preview').val(municipios[$(this).val()] || '');
+  }).trigger('change');
+
+  // DV para NIT
+  function toggleDV() {
+    if ($('#id_tipo_documento').val() === 'NIT') { $('#dv_wrap').show(); } else { $('#dv_wrap').hide(); $('#id_dv').val(''); }
+  }
+  $('#id_tipo_documento').on('change', toggleDV); toggleDV();
+
+  // Cuál documento
+  function toggleCualDocumento() {
+    if ($('#id_tipo_documento').val() === 'OTRO') { $('#cual_documento_wrap').show(); } else { $('#cual_documento_wrap').hide(); $('#id_cual_documento').val(''); }
+  }
+  $('#id_tipo_documento').on('change', toggleCualDocumento); toggleCualDocumento();
+
+  // Tipo jurídica
+  function toggleTipoJuridica() {
+    if ($('#id_tipo_persona').val() === 'JURIDICA') {
+      $('#bloque-juridica').show();
+      if ($('#id_tipo_documento').val() !== 'NIT') { $('#id_tipo_documento').val('NIT').trigger('change'); }
+    } else { $('#bloque-juridica').hide(); $('#id_tipo_juridica').val(''); $('#bloque-otro').hide(); $('#id_otro_tipo_juridica').val(''); }
+  }
+  $('#id_tipo_persona').on('change', toggleTipoJuridica); toggleTipoJuridica();
+
+  function toggleOtroTipoJuridica() {
+    if ($('#id_tipo_juridica').val() === 'OTRO' && $('#id_tipo_persona').val() === 'JURIDICA') { $('#bloque-otro').show(); } else { $('#bloque-otro').hide(); $('#id_otro_tipo_juridica').val(''); }
+  }
+  $('#id_tipo_juridica').on('change', toggleOtroTipoJuridica); toggleOtroTipoJuridica();
+
+  // Cálculo DV
+  function calcularDV(nit) {
+    nit = nit.replace(/\D/g, '');
+    if (!nit.length) return '';
+    const primos = [3,7,13,17,19,23,29,37,41,43,47,53,59,67,71];
+    let suma = 0;
+    for (let i = 0; i < nit.length; i++) suma += parseInt(nit[nit.length-1-i]) * primos[i];
+    const r = suma % 11;
+    return r === 0 ? '0' : r === 1 ? '1' : String(11-r);
+  }
+  $('#id_numero_documento').on('input', function() {
+    if ($('#id_tipo_documento').val() === 'NIT') $('#id_dv').val(calcularDV($(this).val()));
+  });
+
+  // Establecimientos
+  $('#id_tiene_establecimientos').hide();
+  function toggleEstablecimientos() {
+    if ($('input[name="tiene_establecimientos_radio"]:checked').val() === 'true') {
+      $('#id_tiene_establecimientos').prop('checked', true); $('#seccion-establecimientos').show();
+    } else {
+      $('#id_tiene_establecimientos').prop('checked', false); $('#seccion-establecimientos').hide();
+    }
+  }
+  $('input[name="tiene_establecimientos_radio"]').on('change', toggleEstablecimientos); toggleEstablecimientos();
+
+  // Representantes dinámicos
+  let repTotalForms = $('#id_representantes-TOTAL_FORMS');
+  $('#add-representante').on('click', function() {
+    const container = $('#representantes-container');
+    const formIdx = parseInt(repTotalForms.val());
+    const newForm = container.find('.representante-row:first').clone(true);
+    newForm.find('input, select').each(function() {
+      const name = $(this).attr('name');
+      if (name) { $(this).attr('name', name.replace(/-\d+-/, `-${formIdx}-`)); $(this).attr('id', ($(this).attr('id')||'').replace(/-\d+-/, `-${formIdx}-`)); }
+      $(this).val('');
+    });
+    newForm.removeClass('border-danger').find('.text-danger').remove();
+    container.append(newForm);
+    repTotalForms.val(formIdx + 1);
+  });
+  $(document).on('click', '.remove-representante', function() {
+    if ($('#representantes-container .representante-row').length > 1) { $(this).closest('.representante-row').remove(); repTotalForms.val($('#representantes-container .representante-row').length); }
+  });
+
+  // Establecimientos dinámicos
+  let estTotalForms = $('#id_establecimientos-TOTAL_FORMS');
+  $('#add-establecimiento').on('click', function() {
+    const container = $('#establecimientos-container');
+    const formIdx = parseInt(estTotalForms.val());
+    const newForm = container.find('.establecimiento-row:first').clone(true);
+    newForm.find('input, select').each(function() {
+      const name = $(this).attr('name');
+      if (name) { $(this).attr('name', name.replace(/-\d+-/, `-${formIdx}-`)); $(this).attr('id', ($(this).attr('id')||'').replace(/-\d+-/, `-${formIdx}-`)); }
+      if ($(this).is('input[type="text"],input[type="date"]')) $(this).val('');
+      if ($(this).is('input[type="checkbox"]')) $(this).prop('checked', false);
+      if ($(this).is('select')) $(this).val('');
+    });
+    newForm.removeClass('border-danger').find('.text-danger').remove();
+    container.append(newForm);
+    estTotalForms.val(formIdx + 1);
+  });
+  $(document).on('click', '.remove-establecimiento', function() {
+    if ($('#establecimientos-container .establecimiento-row').length > 1) { $(this).closest('.establecimiento-row').remove(); estTotalForms.val($('#establecimientos-container .establecimiento-row').length); }
+  });
+
+  // Actividades dinámicas
+  let actTotalForms = $('#id_actividades-TOTAL_FORMS');
+  function updateActNumeros() { $('#actividades-container .actividad-row').each(function(i) { $(this).find('.actividad-numero').text(i+1); }); }
+  $('#add-actividad').on('click', function() {
+    const container = $('#actividades-container');
+    const formIdx = parseInt(actTotalForms.val());
+    if (formIdx >= 15) { alert('Máximo 15 actividades.'); return; }
+    const newRow = container.find('.actividad-row:first').clone(false);
+    newRow.find('.select2-container').remove();
+    newRow.find('select').removeAttr('data-select2-id').removeAttr('aria-hidden').css('display', '');
+    newRow.find('[data-select2-id]').removeAttr('data-select2-id');
+    newRow.find('input, select').each(function() {
+      const name = $(this).attr('name'), id = $(this).attr('id')||'';
+      if (name) $(this).attr('name', name.replace(/-\d+-/, `-${formIdx}-`));
+      if (id) $(this).attr('id', id.replace(/-\d+-/, `-${formIdx}-`));
+      if ($(this).is('input')) $(this).val('');
+      if ($(this).is('select')) $(this).val('');
+    });
+    newRow.removeClass('table-danger').find('.text-danger').remove();
+    container.append(newRow);
+    actTotalForms.val(formIdx + 1);
+    newRow.find('.actividad-select').select2({ theme: 'bootstrap-5', placeholder: 'Seleccione una actividad', allowClear: true, width: '100%' });
+    updateActNumeros();
+  });
+  $(document).on('click', '.remove-actividad', function() {
+    if ($('#actividades-container .actividad-row').length > 1) { $(this).closest('.actividad-row').remove(); actTotalForms.val($('#actividades-container .actividad-row').length); updateActNumeros(); }
+  });
+
+});
+</script>
+
+<style>
+  .card-header { font-weight: bold; }
+  .form-label { font-weight: 500; margin-bottom: 0.25rem; }
+  .representante-row, .establecimiento-row { background-color: #f8f9fa; }
+</style>
+
+{% endblock %}
