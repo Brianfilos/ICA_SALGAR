@@ -2917,7 +2917,7 @@ def generar_pdf_rit(request, rit_id):
     # Verificar permisos: usuario normal solo puede ver sus propios PDFs
     # (omitido si viene desde la vista pública con token válido)
     if not getattr(request, '_rit_public', False):
-        if not is_admin(request.user) and rit.user != request.user:
+        if not is_admin(request.user) and not is_alcaldia_gestion(request.user) and rit.user != request.user:
             messages.error(request, 'No tienes permiso para ver este documento.')
             return redirect('tasks_completed')
 
