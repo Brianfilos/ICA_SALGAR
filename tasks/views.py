@@ -683,7 +683,8 @@ def tasks_completed(request):
 
     is_admin_user  = is_admin(request.user)
     is_revisor_user = is_revisor(request.user)
-    puede_ver_todo = is_admin_user or is_revisor_user
+    is_alcaldia = is_alcaldia_gestion(request.user)
+    puede_ver_todo = is_admin_user or is_revisor_user or is_alcaldia
 
     filtro_documento = request.GET.get('documento', '').strip()
     filtro_proceso   = request.GET.get('proceso', '')
