@@ -475,7 +475,10 @@ $(document).ready(function() {
       const name = $(this).attr('name'), id = $(this).attr('id')||'';
       if (name) $(this).attr('name', name.replace(/-\d+-/, `-${formIdx}-`));
       if (id) $(this).attr('id', id.replace(/-\d+-/, `-${formIdx}-`));
-      if ($(this).is('input')) $(this).val('');
+      if ($(this).is('input')) {
+        const nm = $(this).attr('name') || '';
+        $(this).val(nm.endsWith('-base_gravable_mensual') ? '0' : '');
+      }
       if ($(this).is('select')) $(this).val('');
     });
     newRow.removeClass('table-danger').find('.text-danger').remove();
