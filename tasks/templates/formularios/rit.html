@@ -17,32 +17,40 @@
   {% endif %}
 
   <!-- Mostrar errores de validación -->
-  {% if form.errors or representantes_formset.errors or establecimientos_formset.errors or actividades_formset.errors %}
+  {% if form.errors or representantes_formset.errors or establecimientos_formset.errors or representantes_formset.non_form_errors or establecimientos_formset.non_form_errors %}
     <div class="alert alert-danger">
       <h6 class="fw-bold">Por favor corrija los siguientes errores:</h6>
-      {% if form.non_field_errors %}
-        <ul class="mb-1">
-          {% for error in form.non_field_errors %}
-            <li>{{ error }}</li>
+      <ul class="mb-1">
+        {% for error in form.non_field_errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+        {% for field, errors in form.errors.items %}
+          {% if field != '__all__' %}
+            <li><strong>{{ field }}:</strong> {{ errors|join:", " }}</li>
+          {% endif %}
+        {% endfor %}
+
+        {# Representantes #}
+        {% for error in representantes_formset.non_form_errors %}
+          <li><strong>Representantes:</strong> {{ error }}</li>
+        {% endfor %}
+        {% for rep_form in representantes_formset %}
+          {% for field, errors in rep_form.errors.items %}
+            <li><strong>Representante {{ forloop.parentloop.counter }} — {{ field }}:</strong> {{ errors|join:", " }}</li>
           {% endfor %}
-        </ul>
-      {% endif %}
-      {% if form.errors %}
-        <ul class="mb-1">
-          {% for field, errors in form.errors.items %}
-            {% if field != '__all__' %}
-              <li><strong>{{ field }}:</strong> {{ errors|join:", " }}</li>
-            {% endif %}
+        {% endfor %}
+
+        {# Establecimientos #}
+        {% for error in establecimientos_formset.non_form_errors %}
+          <li><strong>Establecimientos:</strong> {{ error }}</li>
+        {% endfor %}
+        {% for est_form in establecimientos_formset %}
+          {% for field, errors in est_form.errors.items %}
+            <li><strong>Establecimiento {{ forloop.parentloop.counter }} — {{ field }}:</strong> {{ errors|join:", " }}</li>
           {% endfor %}
-        </ul>
-      {% endif %}
-      {% if actividades_formset.non_form_errors %}
-        <ul class="mb-1">
-          {% for error in actividades_formset.non_form_errors %}
-            <li><strong>Actividades:</strong> {{ error }}</li>
-          {% endfor %}
-        </ul>
-      {% endif %}
+        {% endfor %}
+
+      </ul>
     </div>
   {% endif %}
 
@@ -221,7 +229,6 @@
         <div class="row g-3 mt-1">
           <div class="col-md-6">
             <label class="form-label">7. Domicilio principal</label>
-            {% if not perfil %}
             <!-- Constructor de dirección estilo IGAC -->
             <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
               <select id="v_tipo" class="form-select form-select-sm" style="width:90px" title="Tipo de vía">
@@ -241,8 +248,8 @@
               </select>
               <span class="fw-bold text-primary px-1">CON</span>
               <select id="g_tipo" class="form-select form-select-sm" style="width:90px" title="Tipo vía generadora">
-                <option value="CLL">CLL</option>
                 <option value="CRR">CRR</option>
+                <option value="CLL">CLL</option>
                 <option value="DIAG">DIAG</option>
                 <option value="TRANS">TRANS</option>
                 <option value="AV">AV</option>
@@ -254,6 +261,13 @@
                 <option value="B">B</option>
                 <option value="C">C</option>
                 <option value="D">D</option>
+              </select>
+              <select id="g_card" class="form-select form-select-sm" style="width:85px" title="Posición (cardinal)">
+                <option value="">Cardinal</option>
+                <option value="SUR">SUR</option>
+                <option value="NORTE">NORTE</option>
+                <option value="ESTE">ESTE</option>
+                <option value="OESTE">OESTE</option>
               </select>
               <span class="fw-bold text-secondary px-1">-</span>
               <input type="text" id="p_num" class="form-control form-control-sm addr-input" placeholder="Nro." style="width:60px" title="Número del predio">
@@ -273,12 +287,11 @@
             <!-- Resultado concatenado visible -->
             <input type="text" id="addr_preview" class="form-control form-control-sm bg-light"
                    readonly placeholder="Dirección generada automáticamente..."
-                   style="font-weight:500; color:#212529;">
+                   style="font-weight:500; color:#212529;"
+                   value="{{ form.direccion_notificacion.value|default:'' }}">
             <!-- Campo real oculto — JS lo llena -->
-            <input type="hidden" name="direccion_notificacion" id="id_direccion_notificacion">
-            {% else %}
-            {{ form.direccion_notificacion }}
-            {% endif %}
+            <input type="hidden" name="direccion_notificacion" id="id_direccion_notificacion"
+                   value="{{ form.direccion_notificacion.value|default:'' }}">
           </div>
 
           <div class="col-md-3">
@@ -301,7 +314,7 @@
           </div>
 
           <div class="col-md-5">
-            <label class="form-label">9. Correo electrónico</label>
+            <label class="form-label">9. Correo electrónico para notificaciones</label>
             {{ form.correo_electronico }}
           </div>
 
@@ -318,11 +331,8 @@
     <!-- SECCIÓN C: REPRESENTACIÓN LEGAL -->
     <!-- ========================= -->
     <div class="card mb-3" id="seccion-representantes">
-      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-        <strong>C. REPRESENTACIÓN LEGAL</strong>
-        <button type="button" class="btn btn-sm btn-light" id="add-representante">
-          + Agregar
-        </button>
+      <div class="card-header bg-dark text-white">
+        <strong>C. REPRESENTACIÓN LEGAL, APODERADO GENERAL, APODERADO JUDICIAL O REPRESENTANTE JUDICIAL</strong>
       </div>
       <div class="card-body">
         {{ representantes_formset.management_form }}
@@ -346,14 +356,9 @@
                   <label class="form-label small">No. documento</label>
                   {{ rep_form.numero_documento }}
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-3">
                   <label class="form-label small">Correo electrónico</label>
                   {{ rep_form.correo_electronico }}
-                </div>
-                <div class="col-md-1 text-end">
-                  <button type="button" class="btn btn-sm btn-outline-danger remove-representante">
-                    <i class="bi bi-trash"></i> X
-                  </button>
                 </div>
                 {{ rep_form.orden }}
                 {{ rep_form.id }}
@@ -371,40 +376,16 @@
       </div>
     </div>
 
-    <!-- ========================= -->
-    <!-- PREGUNTA: ¿TIENE ESTABLECIMIENTOS? -->
-    <!-- ========================= -->
-    <div class="card mb-3">
-      <div class="card-body">
-        <div class="row">
-          <div class="col-md-12">
-            <label class="form-label fw-semibold">¿Tiene establecimientos?</label>
-            <div class="form-check form-check-inline">
-              {{ form.tiene_establecimientos }}
-              <input class="form-check-input" type="radio" name="tiene_establecimientos_radio" id="tiene_establecimientos_si" value="true" {% if form.tiene_establecimientos.value == True or form.tiene_establecimientos.value == None %}checked{% endif %}>
-              <label class="form-check-label" for="tiene_establecimientos_si">Sí</label>
-            </div>
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="radio" name="tiene_establecimientos_radio" id="tiene_establecimientos_no" value="false" {% if form.tiene_establecimientos.value == False %}checked{% endif %}>
-              <label class="form-check-label" for="tiene_establecimientos_no">No</label>
-            </div>
-            {% if form.tiene_establecimientos.errors %}
-              <div class="text-danger small mt-1">{{ form.tiene_establecimientos.errors }}</div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Campo tiene_establecimientos oculto (siempre Sí; la sección D se controla
+         por el número de establecimientos en la sección B) -->
+    <div style="display:none;">{{ form.tiene_establecimientos }}</div>
 
     <!-- ========================= -->
     <!-- SECCIÓN D: ESTABLECIMIENTOS -->
     <!-- ========================= -->
     <div class="card mb-3" id="seccion-establecimientos">
-      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-        <strong>D. ESTABLECIMIENTOS DE COMERCIO, SUC, AGENCIA EN SEGOVIA</strong>
-        <button type="button" class="btn btn-sm btn-light" id="add-establecimiento">
-          + Agregar
-        </button>
+      <div class="card-header bg-dark text-white">
+        <strong>D. ESTABLECIMIENTOS DE COMERCIO, SUCURSAL O AGENCIA EN SALGAR</strong>
       </div>
       <div class="card-body">
         {{ establecimientos_formset.management_form }}
@@ -416,7 +397,7 @@
                   <label class="form-label small">Nombre del establecimiento</label>
                   {{ est_form.nombre }}
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                   <label class="form-label small">Dirección</label>
                   {{ est_form.direccion }}
                 </div>
@@ -432,11 +413,6 @@
                   <label class="form-label small d-block">Avisos/Tableros</label>
                   {{ est_form.tiene_avisos_tableros }}
                 </div>
-                <div class="col-md-1 text-end">
-                  <button type="button" class="btn btn-sm btn-outline-danger remove-establecimiento">
-                    <i class="bi bi-trash"></i> X
-                  </button>
-                </div>
                 {{ est_form.orden }}
                 {{ est_form.id }}
                 {% if est_form.instance.pk %}{{ est_form.DELETE }}{% endif %}
@@ -449,67 +425,63 @@
               {% if est_form.errors %}
                 <div class="text-danger small mt-1">{{ est_form.errors }}</div>
               {% endif %}
+
+              <!-- Actividades económicas (CIIU) de este establecimiento -->
+              <div class="mt-3 pt-2 border-top">
+                <label class="form-label small fw-bold mb-1">
+                  <i class="bi bi-list-check"></i> Actividades económicas (CIIU) de este establecimiento
+                </label>
+                <div class="est-actividades">
+                  {% if est_form.instance.pk %}
+                    {% for act in est_form.instance.actividades.all %}
+                      <div class="est-act-row d-flex gap-2 mb-1 align-items-center">
+                        <select class="form-select form-select-sm est-act-select" style="flex:1;">
+                          <option value="">Seleccione una actividad</option>
+                          {% for a in actividades_catalogo %}
+                            <option value="{{ a.id }}" {% if a.id == act.actividad_id %}selected{% endif %}>{{ a.codigo }} - {{ a.nombre }}</option>
+                          {% endfor %}
+                        </select>
+                        <button type="button" class="btn btn-sm btn-outline-danger est-act-remove" title="Quitar">X</button>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                  {% if forloop.first and rit_activo %}
+                    {% for act in rit_activo.actividades_rit.all %}
+                      {% if not act.establecimiento_id %}
+                        <div class="est-act-row d-flex gap-2 mb-1 align-items-center">
+                          <select class="form-select form-select-sm est-act-select" style="flex:1;">
+                            <option value="">Seleccione una actividad</option>
+                            {% for a in actividades_catalogo %}
+                              <option value="{{ a.id }}" {% if a.id == act.actividad_id %}selected{% endif %}>{{ a.codigo }} - {{ a.nombre }}</option>
+                            {% endfor %}
+                          </select>
+                          <button type="button" class="btn btn-sm btn-outline-danger est-act-remove" title="Quitar">X</button>
+                        </div>
+                      {% endif %}
+                    {% endfor %}
+                  {% endif %}
+                </div>
+                <button type="button" class="btn btn-sm btn-light est-act-add mt-1">
+                  <i class="bi bi-plus-lg"></i> Agregar actividad
+                </button>
+              </div>
             </div>
           {% endfor %}
         </div>
-      </div>
-    </div>
-
-    <!-- ========================= -->
-    <!-- SECCIÓN E: ACTIVIDADES ECONÓMICAS -->
-    <!-- ========================= -->
-    <div class="card mb-3">
-      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-        <strong>E. ACTIVIDADES ECONÓMICAS</strong>
-        <button type="button" class="btn btn-sm btn-light" id="add-actividad">
-          + Agregar
-        </button>
-      </div>
-      <div class="card-body">
-        {{ actividades_formset.management_form }}
-        <table class="table table-sm table-bordered" id="actividades-table">
-          <thead class="table-light">
-            <tr>
-              <th style="width: 5%;">#</th>
-              <th style="width: 65%;">Actividad Económica</th>
-              <th style="width: 25%;">Base Gravable Mensual</th>
-              <th style="width: 5%;"></th>
-            </tr>
-          </thead>
-          <tbody id="actividades-container">
-            {% for act_form in actividades_formset %}
-              <tr class="actividad-row {% if act_form.errors %}table-danger{% endif %}">
-                <td class="actividad-numero align-middle text-center">{{ forloop.counter }}</td>
-                <td>
-                  {{ act_form.actividad }}
-                  {% if act_form.actividad.errors %}
-                    <div class="text-danger small">{{ act_form.actividad.errors }}</div>
-                  {% endif %}
-                </td>
-                <td>
-                  {{ act_form.base_gravable_mensual }}
-                  {% if act_form.base_gravable_mensual.errors %}
-                    <div class="text-danger small">{{ act_form.base_gravable_mensual.errors }}</div>
-                  {% endif %}
-                </td>
-                <td class="text-center align-middle">
-                  <button type="button" class="btn btn-sm btn-outline-danger remove-actividad">X</button>
-                  {{ act_form.orden }}
-                  {{ act_form.id }}
-                  {% if act_form.instance.pk %}{{ act_form.DELETE }}{% endif %}
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% if actividades_formset.non_form_errors %}
-          <div class="alert alert-danger">{{ actividades_formset.non_form_errors }}</div>
-        {% endif %}
-        <p class="text-muted small mb-0">
-          <i class="bi bi-info-circle"></i> Mínimo 1, máximo 15 actividades económicas.
+        <p class="text-muted small mb-0 mt-2">
+          <i class="bi bi-info-circle"></i> Cada establecimiento debe tener al menos 1 actividad económica (CIIU).
         </p>
       </div>
     </div>
+
+    <!-- Campo oculto: actividades CIIU agrupadas por establecimiento (JSON) -->
+    <input type="hidden" name="actividades_json" id="actividades_json">
+
+    <!-- Plantilla oculta de opciones CIIU (para clonar selects con JS) -->
+    <select id="ciiu-template" class="d-none" aria-hidden="true">
+      <option value="">Seleccione una actividad</option>
+      {% for a in actividades_catalogo %}<option value="{{ a.id }}">{{ a.codigo }} - {{ a.nombre }}</option>{% endfor %}
+    </select>
 
     <!-- ========================= -->
     <!-- SECCIÓN F: FIRMAS -->
@@ -524,7 +496,7 @@
           <div>
             <strong>Firma Electrónica mediante Código OTP</strong><br>
             Al hacer clic en <strong>Crear</strong>, se enviará un código de verificación de 6 dígitos
-            a su correo electrónico registrado. Deberá ingresar ese código para completar la
+            a su correo electrónico de notificaciones (campo 9). Deberá ingresar ese código para completar la
             <strong>firma electrónica simple</strong> del Registro RIT, conforme a la
             Ley 527 de 1999 (Colombia). El código tendrá una vigencia de <strong>15 minutos</strong>.
           </div>
@@ -577,13 +549,6 @@ $(document).ready(function() {
       allowClear: true,
       width: '100%'
     });
-
-    $('.actividad-select').select2({
-      theme: 'bootstrap-5',
-      placeholder: 'Seleccione una actividad',
-      allowClear: true,
-      width: '100%'
-    });
   }
   initSelect2();
 
@@ -600,10 +565,12 @@ $(document).ready(function() {
     $('#id_municipio_notificacion').trigger('change');
   }
 
-  // =====================
-  // Deshabilitar opción ICA Simplificado (solo visualización)
-  // =====================
-  $('#id_clase_contribuyente option[value="ICA_SIMPLIFICADO"]').prop('disabled', true);
+  // Solo Ordinario está disponible para inscripción RIT
+  $('#id_clase_contribuyente option').not('[value="ORDINARIO"]').prop('disabled', true).css('color', '#aaa');
+  // Asegurar que Ordinario quede seleccionado
+  if (!$('#id_clase_contribuyente').val()) {
+    $('#id_clase_contribuyente').val('ORDINARIO');
+  }
 
   // =====================
   // NO_SUJETO → Agente de Retención ICA automático
@@ -637,26 +604,25 @@ $(document).ready(function() {
   toggleSeccionCancelacion();
 
   // =====================
-  // Mostrar/ocultar sección D (Establecimientos)
+  // Establecimientos siempre habilitados (la cantidad la controla el campo
+  // "No. establecimientos" de la sección B). Se conserva el checkbox de Django
+  // oculto y marcado para que el formulario envíe tiene_establecimientos=True.
   // =====================
+  $('#id_tiene_establecimientos').prop('checked', true).hide();
 
-  // Ocultar el campo checkbox original de Django
-  $('#id_tiene_establecimientos').hide();
-
-  function toggleSeccionEstablecimientos() {
-    const tieneEstablecimientos = $('input[name="tiene_establecimientos_radio"]:checked').val();
-
-    if (tieneEstablecimientos === 'true') {
-      $('#id_tiene_establecimientos').prop('checked', true);
-      $('#seccion-establecimientos').show();
+  // =====================
+  // Ocultar representantes para persona natural
+  // =====================
+  function toggleRepresentantes() {
+    const tipoPers = $('#id_tipo_persona').val();
+    if (tipoPers === 'NATURAL') {
+      $('#seccion-representantes').hide();
     } else {
-      $('#id_tiene_establecimientos').prop('checked', false);
-      $('#seccion-establecimientos').hide();
+      $('#seccion-representantes').show();
     }
   }
-
-  $('input[name="tiene_establecimientos_radio"]').on('change', toggleSeccionEstablecimientos);
-  toggleSeccionEstablecimientos();
+  $('#id_tipo_persona').on('change', toggleRepresentantes);
+  toggleRepresentantes();
 
   // =====================
   // DV solo si NIT
@@ -741,20 +707,6 @@ $(document).ready(function() {
   toggleTipoJuridica();
 
   // =====================
-  // Ocultar representantes para persona natural
-  // =====================
-  function toggleRepresentantes() {
-    const tipoPers = $('#id_tipo_persona').val();
-    if (tipoPers === 'NATURAL') {
-      $('#seccion-representantes').hide();
-    } else {
-      $('#seccion-representantes').show();
-    }
-  }
-  $('#id_tipo_persona').on('change', toggleRepresentantes);
-  toggleRepresentantes();
-
-  // =====================
   // Otro tipo jurídico si OTRO
   // =====================
   function toggleOtroTipoJuridica() {
@@ -773,14 +725,28 @@ $(document).ready(function() {
   // =====================
   // Constructor estructurado de dirección
   // =====================
+  // La vía generadora no puede ser del mismo tipo que la vía principal
+  function syncViaGeneradora() {
+    const v = $('#v_tipo').val();
+    $('#g_tipo option').prop('disabled', false);
+    $('#g_tipo option[value="' + v + '"]').prop('disabled', true);
+    if ($('#g_tipo').val() === v) {
+      const alt = $('#g_tipo option').filter(function() {
+        return $(this).val() !== v;
+      }).first().val();
+      $('#g_tipo').val(alt);
+    }
+  }
+
   // Constructor de dirección IGAC
   function buildDireccion() {
     const tipo   = $('#v_tipo').val()  || 'CLL';
     const vnum   = $('#v_num').val().trim();
     const vletra = $('#v_letra').val() || '';
-    const gtipo  = $('#g_tipo').val()  || 'CLL';
+    const gtipo  = $('#g_tipo').val()  || 'CRR';
     const gnum   = $('#g_num').val().trim();
     const gletra = $('#g_letra').val() || '';
+    const gcard  = $('#g_card').val()  || '';
     const pnum   = $('#p_num').val().trim();
     const ctype  = $('#c_tipo').val()  || '';
     const cnum   = $('#c_num').val().trim();
@@ -791,6 +757,7 @@ $(document).ready(function() {
     dir += ' CON ' + gtipo;
     if (gnum)   dir += ' ' + gnum;
     if (gletra) dir += gletra;
+    if (gcard)  dir += ' ' + gcard;
     if (pnum)   dir += ' - ' + pnum;
     if (ctype && cnum) dir += ' ' + ctype + ' ' + cnum;
     else if (ctype)    dir += ' ' + ctype;
@@ -801,60 +768,104 @@ $(document).ready(function() {
     $('#addr_preview').val(result);
   }
 
-  $('#v_tipo, #v_letra, #g_tipo, #g_letra, #c_tipo').on('change', buildDireccion);
+  $('#v_tipo').on('change', function() { syncViaGeneradora(); buildDireccion(); });
+  $('#v_letra, #g_tipo, #g_letra, #g_card, #c_tipo').on('change', buildDireccion);
   $('#v_num, #g_num, #p_num, #c_num').on('input', buildDireccion);
-  buildDireccion();
+  // Sincroniza la restricción al cargar; NO reconstruye la dirección para no
+  // pisar un valor previamente guardado (solo se reconstruye al interactuar).
+  syncViaGeneradora();
 
-  // =====================
-  // FORMSET DINÁMICO: Representantes
-  // =====================
-  let repTotalForms = $('#id_representantes-TOTAL_FORMS');
-
-  $('#add-representante').on('click', function() {
-    const container = $('#representantes-container');
-    const formIdx = parseInt(repTotalForms.val());
-    const newForm = container.find('.representante-row:first').clone(true);
-
-    newForm.find('input, select').each(function() {
-      const name = $(this).attr('name');
-      if (name) {
-        $(this).attr('name', name.replace(/-\d+-/, `-${formIdx}-`));
-        $(this).attr('id', $(this).attr('id').replace(/-\d+-/, `-${formIdx}-`));
-      }
-      if ($(this).is('input')) $(this).val('');
-      if ($(this).is('select')) $(this).val('');
+  // Reindexa todas las filas de un formset a 0..n-1 y actualiza TOTAL_FORMS.
+  // Conserva el valor del campo id (pk) en cada fila, así Django sabe qué
+  // registro actualizar/borrar aunque cambie el índice.
+  function reindexFormset(containerSel, rowSel, prefix) {
+    const container = $(containerSel);
+    let i = 0;
+    container.find(rowSel).each(function() {
+      $(this).find('input, select, textarea').each(function() {
+        const el = $(this);
+        ['name', 'id'].forEach(function(attr) {
+          const v = el.attr(attr);
+          if (v) el.attr(attr, v.replace(new RegExp(prefix + '-\\d+-'), prefix + '-' + i + '-'));
+        });
+      });
+      i++;
     });
+    $('#id_' + prefix + '-TOTAL_FORMS').val(i);
+  }
 
-    newForm.removeClass('border-danger');
-    newForm.find('.text-danger').remove();
-    container.append(newForm);
-    repTotalForms.val(formIdx + 1);
-  });
-
-  $(document).on('click', '.remove-representante', function() {
-    const container = $('#representantes-container');
-    if (container.find('.representante-row').length > 1) {
-      $(this).closest('.representante-row').remove();
-      repTotalForms.val(container.find('.representante-row').length);
+  // Quita una fila de formset de forma compatible con Django:
+  //  - Si es un registro YA guardado (tiene checkbox DELETE): lo marca para
+  //    borrar y oculta la fila (la mantiene en el DOM para que Django la lea).
+  //  - Si es una fila nueva sin guardar: la elimina del DOM y reindexa.
+  function removeFormRow(btn, containerSel, rowSel, prefix) {
+    const container = $(containerSel);
+    const row = $(btn).closest(rowSel);
+    const del = row.find('input[name$="-DELETE"]');
+    if (del.length) {
+      del.prop('checked', true);
+      row.hide();
+    } else {
+      const visibles = container.find(rowSel).filter(':visible').length;
+      if (visibles > 1) {
+        row.remove();
+        reindexFormset(containerSel, rowSel, prefix);
+      }
     }
-  });
+  }
 
   // =====================
-  // FORMSET DINÁMICO: Establecimientos
+  // FORMSET ESTABLECIMIENTOS: la cantidad de filas la controla "No. establecimientos"
   // =====================
   let estTotalForms = $('#id_establecimientos-TOTAL_FORMS');
 
-  $('#add-establecimiento').on('click', function() {
+  // ---- Actividades CIIU por establecimiento ----
+  const CIIU_OPTIONS_HTML = document.getElementById('ciiu-template').innerHTML;
+
+  function initActSelect2($sel) {
+    $sel.select2({
+      theme: 'bootstrap-5',
+      placeholder: 'Seleccione una actividad',
+      allowClear: true,
+      width: '100%',
+    });
+  }
+
+  // Agrega una fila de actividad (select CIIU) al contenedor .est-actividades dado
+  function addActivityRow($estAct, value) {
+    const $row = $(
+      '<div class="est-act-row d-flex gap-2 mb-1 align-items-center">' +
+        '<select class="form-select form-select-sm est-act-select" style="flex:1;"></select>' +
+        '<button type="button" class="btn btn-sm btn-outline-danger est-act-remove" title="Quitar">X</button>' +
+      '</div>'
+    );
+    const $sel = $row.find('.est-act-select');
+    $sel.html(CIIU_OPTIONS_HTML);
+    if (value) $sel.val(String(value));
+    $estAct.append($row);
+    initActSelect2($sel);
+  }
+
+  // Garantiza al menos 1 fila de actividad por establecimiento
+  function ensureActivityRows() {
+    $('#establecimientos-container .establecimiento-row').each(function() {
+      const $estAct = $(this).find('.est-actividades');
+      if ($estAct.find('.est-act-row').length === 0) addActivityRow($estAct, '');
+    });
+  }
+
+  function buildEstablecimientoRow() {
     const container = $('#establecimientos-container');
     const formIdx = parseInt(estTotalForms.val());
-    const newForm = container.find('.establecimiento-row:first').clone(true);
+    // clone(false): sin eventos ni datos, para no arrastrar artefactos de Select2
+    const newForm = container.find('.establecimiento-row:first').clone(false);
 
-    newForm.find('input, select').each(function() {
+    // Reindexar SOLO los campos Django del establecimiento (los que tienen name)
+    newForm.find('input[name], select[name], textarea[name]').each(function() {
       const name = $(this).attr('name');
-      if (name) {
-        $(this).attr('name', name.replace(/-\d+-/, `-${formIdx}-`));
-        $(this).attr('id', $(this).attr('id').replace(/-\d+-/, `-${formIdx}-`));
-      }
+      $(this).attr('name', name.replace(/-\d+-/, `-${formIdx}-`));
+      const id = $(this).attr('id') || '';
+      if (id) $(this).attr('id', id.replace(/-\d+-/, `-${formIdx}-`));
       if ($(this).is('input[type="text"], input[type="date"]')) $(this).val('');
       if ($(this).is('input[type="checkbox"]')) $(this).prop('checked', false);
       if ($(this).is('select')) $(this).val('');
@@ -862,78 +873,140 @@ $(document).ready(function() {
 
     newForm.removeClass('border-danger');
     newForm.find('.text-danger').remove();
+    newForm.find('input[name$="-DELETE"]').prop('checked', false);
+    newForm.find('input[name$="-id"]').val('');
+
+    // Reiniciar el bloque de actividades: quitar artefactos Select2 y dejar 1 fila vacía
+    const $estAct = newForm.find('.est-actividades');
+    $estAct.find('.select2-container').remove();
+    $estAct.empty();
+
+    newForm.show();
     container.append(newForm);
     estTotalForms.val(formIdx + 1);
-  });
 
-  $(document).on('click', '.remove-establecimiento', function() {
-    const container = $('#establecimientos-container');
-    if (container.find('.establecimiento-row').length > 1) {
-      $(this).closest('.establecimiento-row').remove();
-      estTotalForms.val(container.find('.establecimiento-row').length);
-    }
-  });
-
-  // =====================
-  // FORMSET DINÁMICO: Actividades
-  // =====================
-  let actTotalForms = $('#id_actividades-TOTAL_FORMS');
-
-  function updateActividadNumeros() {
-    $('#actividades-container .actividad-row').each(function(idx) {
-      $(this).find('.actividad-numero').text(idx + 1);
-    });
+    addActivityRow($estAct, '');
   }
 
-  $('#add-actividad').on('click', function() {
-    const container = $('#actividades-container');
-    const formIdx = parseInt(actTotalForms.val());
+  // Ajusta el número de filas de establecimientos a N (campo No. establecimientos).
+  // allowShrink=false (al cargar) evita borrar filas ya guardadas por inconsistencias.
+  function syncEstablecimientos(allowShrink) {
+    const container = $('#establecimientos-container');
+    const n = Math.max(0, parseInt($('#id_numero_establecimientos').val()) || 0);
+    let visibles = container.find('.establecimiento-row:visible').length;
 
-    if (formIdx >= 15) {
-      alert('Máximo 15 actividades permitidas.');
+    while (visibles < n) { buildEstablecimientoRow(); visibles++; }
+
+    if (!allowShrink) return;
+
+    while (visibles > n) {
+      const row = container.find('.establecimiento-row:visible').last();
+      const del = row.find('input[name$="-DELETE"]');
+      if (del.length) {
+        del.prop('checked', true);
+        row.hide();
+      } else {
+        row.remove();
+        reindexFormset('#establecimientos-container', '.establecimiento-row', 'establecimientos');
+      }
+      visibles--;
+    }
+  }
+
+  // Inicializar Select2 en los selects de actividad ya renderizados por el servidor
+  $('.est-act-select').each(function() { initActSelect2($(this)); });
+
+  $('#id_numero_establecimientos').on('input change', function() { syncEstablecimientos(true); });
+  syncEstablecimientos(false);
+  ensureActivityRows();
+
+  // Repoblar actividades tras un error de validación (no perder lo seleccionado)
+  (function() {
+    const prev = '{{ actividades_json_prev|default:""|escapejs }}';
+    if (!prev) return;
+    let arr;
+    try { arr = JSON.parse(prev); } catch (e) { return; }
+    arr.forEach(function(grp) {
+      const $row = $('#establecimientos-container .establecimiento-row').eq(grp.est);
+      if (!$row.length) return;
+      const $estAct = $row.find('.est-actividades');
+      $estAct.find('.est-act-row .est-act-select').each(function() {
+        if ($(this).hasClass('select2-hidden-accessible')) $(this).select2('destroy');
+      });
+      $estAct.empty();
+      const acts = grp.actividades || [];
+      if (acts.length) { acts.forEach(function(id) { addActivityRow($estAct, id); }); }
+      else { addActivityRow($estAct, ''); }
+    });
+  })();
+
+  // Preselección de actividad CIIU proveniente de una visita (1er establecimiento)
+  (function() {
+    const ini = '{{ actividad_inicial_id|default:"" }}';
+    if (!ini) return;
+    const $sel = $('#establecimientos-container .establecimiento-row:first .est-act-select').first();
+    if ($sel.length) $sel.val(ini).trigger('change');
+  })();
+
+  // Agregar actividad a un establecimiento
+  $(document).on('click', '.est-act-add', function() {
+    const $estAct = $(this).closest('.establecimiento-row').find('.est-actividades');
+    if ($estAct.find('.est-act-row').length >= 15) {
+      alert('Máximo 15 actividades por establecimiento.');
       return;
     }
-
-    // Clonar sin datos/eventos para evitar conflicto con Select2
-    const newRow = container.find('.actividad-row:first').clone(false);
-
-    // Eliminar contenedores Select2 clonados y limpiar atributos Select2
-    newRow.find('.select2-container').remove();
-    newRow.find('select').removeAttr('data-select2-id').removeAttr('aria-hidden').css('display', '');
-    newRow.find('[data-select2-id]').removeAttr('data-select2-id');
-
-    newRow.find('input, select').each(function() {
-      const name = $(this).attr('name');
-      const id   = $(this).attr('id') || '';
-      if (name) $(this).attr('name', name.replace(/-\d+-/, `-${formIdx}-`));
-      if (id)   $(this).attr('id',   id.replace(/-\d+-/, `-${formIdx}-`));
-      if ($(this).is('input'))  $(this).val('');
-      if ($(this).is('select')) $(this).val('');
-    });
-
-    newRow.removeClass('table-danger');
-    newRow.find('.text-danger').remove();
-    container.append(newRow);
-    actTotalForms.val(formIdx + 1);
-
-    newRow.find('.actividad-select').select2({
-      theme: 'bootstrap-5',
-      placeholder: 'Seleccione una actividad',
-      allowClear: true,
-      width: '100%'
-    });
-
-    updateActividadNumeros();
+    addActivityRow($estAct, '');
   });
 
-  $(document).on('click', '.remove-actividad', function() {
-    const container = $('#actividades-container');
-    if (container.find('.actividad-row').length > 1) {
-      $(this).closest('.actividad-row').remove();
-      actTotalForms.val(container.find('.actividad-row').length);
-      updateActividadNumeros();
+  // Quitar actividad (mínimo 1 por establecimiento)
+  $(document).on('click', '.est-act-remove', function() {
+    const $estAct = $(this).closest('.est-actividades');
+    if ($estAct.find('.est-act-row').length > 1) {
+      const $row = $(this).closest('.est-act-row');
+      const $sel = $row.find('.est-act-select');
+      if ($sel.hasClass('select2-hidden-accessible')) $sel.select2('destroy');
+      $row.remove();
     }
   });
+
+  // Serializar actividades por establecimiento al enviar el formulario
+  $('#btn-crear').closest('form').on('submit', function() {
+    const data = [];
+    $('#establecimientos-container .establecimiento-row').filter(':visible').each(function(i) {
+      const acts = [];
+      $(this).find('.est-act-select').each(function() {
+        const v = $(this).val();
+        if (v) acts.push(parseInt(v));
+      });
+      data.push({ est: i, actividades: acts });
+    });
+    $('#actividades_json').val(JSON.stringify(data));
+  });
+
+  {% if opcion_uso == 'CANCELACION' %}
+  // ===== Cancelación PARCIAL: bloquear todo salvo No. establecimientos y CIIU =====
+  (function() {
+    const $form = $('#btn-crear').closest('form');
+    function lock($el) {
+      const type = ($el.attr('type') || '').toLowerCase();
+      if (type === 'hidden') return;
+      $el.css({ 'pointer-events': 'none', 'background-color': '#e9ecef' }).attr('tabindex', '-1');
+      if (type === 'checkbox' || type === 'radio') {
+        const orig = $el.prop('checked');
+        $el.on('click change', function() { $el.prop('checked', orig); });
+      } else {
+        const orig = $el.val();
+        $el.on('change input', function() { $el.val(orig); });
+      }
+    }
+    $form.find('input, select, textarea').each(function() {
+      const $el = $(this);
+      if ($el.attr('id') === 'id_numero_establecimientos') return;   // permitido
+      if ($el.closest('#seccion-establecimientos').length) return;   // sección D (establecimientos + CIIU)
+      lock($el);
+    });
+  })();
+  {% endif %}
 
 });
 </script>

@@ -672,6 +672,14 @@ class ActividadEconomicaRIT(models.Model):
         on_delete=models.CASCADE,
         related_name="actividades_rit"
     )
+    establecimiento = models.ForeignKey(
+        EstablecimientoRIT,
+        on_delete=models.CASCADE,
+        related_name="actividades",
+        null=True,
+        blank=True,
+        verbose_name="Establecimiento",
+    )
     actividad = models.ForeignKey(
         "catalogos.ActividadEconomica",
         on_delete=models.PROTECT,

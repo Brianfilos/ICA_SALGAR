@@ -1080,6 +1080,7 @@ def proceso_rit(request):
             'clase_contribuyente': 'NORMAL',
         }
         visita_incompleta = None
+        actividad_inicial_id = None
 
         # Para ACTUALIZACION o CANCELACION, cargar datos del RIT activo
         if opcion_uso == 'COMPLETAR' and rit_pendiente:
@@ -1105,7 +1106,6 @@ def proceso_rit(request):
             })
             representantes_formset = RepresentanteLegalRITFormSet(prefix='representantes', instance=rit_pendiente)
             establecimientos_formset = EstablecimientoRITFormSet(prefix='establecimientos', instance=rit_pendiente)
-            actividades_formset = ActividadEconomicaRITFormSet(prefix='actividades', instance=rit_pendiente)
             visita_incompleta = None
         elif opcion_uso in ('ACTUALIZACION', 'CANCELACION') and rit_activo:
             # Cargar datos del RIT activo
@@ -1136,10 +1136,6 @@ def proceso_rit(request):
             )
             establecimientos_formset = EstablecimientoRITFormSet(
                 prefix='establecimientos',
-                instance=rit_activo
-            )
-            actividades_formset = ActividadEconomicaRITFormSet(
-                prefix='actividades',
                 instance=rit_activo
             )
         else:
@@ -1186,28 +1182,24 @@ def proceso_rit(request):
                     ).first()
                     if mun:
                         initial_data['municipio_notificacion'] = mun.id
-                # Pre-llenar actividad en el formset inicial
-                actividad_inicial = []
+                # Pre-seleccionar actividad CIIU de la visita (1er establecimiento)
                 if visita_incompleta.actividad_economica:
                     from catalogos.models import ActividadEconomica as _AE
                     act = _AE.objects.filter(
                         codigo=visita_incompleta.actividad_economica, activo=True
                     ).first()
                     if act:
-                        actividad_inicial = [{'actividad': act.pk}]
+                        actividad_inicial_id = act.pk
             else:
                 visita_incompleta = None
-                actividad_inicial = []
             # Formsets vacíos para inscripción
             representantes_formset = RepresentanteLegalRITFormSet(prefix='representantes')
             establecimientos_formset = EstablecimientoRITFormSet(prefix='establecimientos')
-            actividades_formset = ActividadEconomicaRITFormSet(
-                prefix='actividades',
-                initial=actividad_inicial if actividad_inicial else None,
-            )
 
         form = RITForm(initial=initial_data, perfil=perfil, opcion_uso=opcion_uso)
         municipios_json = get_municipios_departamentos_json()
+        from catalogos.models import ActividadEconomica as _AECat
+        actividades_catalogo = _AECat.objects.filter(activo=True).order_by('codigo')
 
         return render(request, "formularios/rit.html", {
             "form": form,
@@ -1215,7 +1207,8 @@ def proceso_rit(request):
             "municipios_json": municipios_json,
             "representantes_formset": representantes_formset,
             "establecimientos_formset": establecimientos_formset,
-            "actividades_formset": actividades_formset,
+            "actividades_catalogo": actividades_catalogo,
+            "actividad_inicial_id": actividad_inicial_id,
             "opcion_uso": opcion_uso,
             "rit_activo": rit_activo,
             "visita_incompleta": visita_incompleta,
@@ -1226,12 +1219,10 @@ def proceso_rit(request):
         form = RITForm(request.POST, request.FILES, instance=rit_pendiente, perfil=perfil, opcion_uso='INSCRIPCION')
         representantes_formset = RepresentanteLegalRITFormSet(request.POST, prefix='representantes', instance=rit_pendiente)
         establecimientos_formset = EstablecimientoRITFormSet(request.POST, prefix='establecimientos', instance=rit_pendiente)
-        actividades_formset = ActividadEconomicaRITFormSet(request.POST, prefix='actividades', instance=rit_pendiente)
     else:
         form = RITForm(request.POST, request.FILES, perfil=perfil, opcion_uso=opcion_uso)
         representantes_formset = RepresentanteLegalRITFormSet(request.POST, prefix='representantes')
         establecimientos_formset = EstablecimientoRITFormSet(request.POST, prefix='establecimientos')
-        actividades_formset = ActividadEconomicaRITFormSet(request.POST, prefix='actividades')
 
     municipios_json = get_municipios_departamentos_json()
 
@@ -1242,9 +1233,22 @@ def proceso_rit(request):
     tiene_establecimientos = form.cleaned_data.get('tiene_establecimientos', True) if form_valido else True
     establecimientos_valido = establecimientos_formset.is_valid() if tiene_establecimientos else True
 
+    # Actividades CIIU por establecimiento (enviadas como JSON desde el front).
+    # Estructura: [{"est": <indice 0..n>, "actividades": [<id>, ...]}, ...]
+    import json as _json
+    try:
+        actividades_data = _json.loads(request.POST.get('actividades_json') or '[]')
+    except (ValueError, TypeError):
+        actividades_data = []
+    total_actividades = sum(
+        len(grp.get('actividades') or []) for grp in actividades_data
+        if isinstance(grp, dict)
+    )
+    actividades_valido = total_actividades >= 1
+
     # Validar todos los formularios
     if (form_valido and representantes_formset.is_valid() and
-        establecimientos_valido and actividades_formset.is_valid()):
+        establecimientos_valido and actividades_valido):
 
         # Guardar RIT principal
         rit = form.save(commit=False)
@@ -1256,39 +1260,95 @@ def proceso_rit(request):
         rit.asignar_departamento_notificacion()
         rit.save()
 
-        # Guardar representantes
-        representantes = representantes_formset.save(commit=False)
-        for idx, rep in enumerate(representantes):
-            rep.rit = rit
-            rep.orden = idx + 1
-            rep.save()
-        for obj in representantes_formset.deleted_objects:
-            obj.delete()
+        # Guardar representantes / establecimientos / actividades.
+        from .models import RepresentanteLegalRIT, EstablecimientoRIT, ActividadEconomicaRIT
 
-        # Guardar establecimientos (solo si tiene_establecimientos es True)
-        if rit.tiene_establecimientos:
-            establecimientos = establecimientos_formset.save(commit=False)
-            for idx, est in enumerate(establecimientos):
-                est.rit = rit
-                est.orden = idx + 1
-                est.save()
-            for obj in establecimientos_formset.deleted_objects:
+        if opcion_uso == 'COMPLETAR' and rit_pendiente:
+            representantes = representantes_formset.save(commit=False)
+            for idx, rep in enumerate(representantes):
+                rep.rit = rit
+                rep.orden = idx + 1
+                rep.save()
+            for obj in representantes_formset.deleted_objects:
                 obj.delete()
 
-        # Guardar actividades
-        actividades = actividades_formset.save(commit=False)
-        for idx, act in enumerate(actividades):
-            act.rit = rit
-            act.orden = idx + 1
-            act.save()
-        for obj in actividades_formset.deleted_objects:
-            obj.delete()
+            if rit.tiene_establecimientos:
+                establecimientos = establecimientos_formset.save(commit=False)
+                for idx, est in enumerate(establecimientos):
+                    est.rit = rit
+                    est.orden = idx + 1
+                    est.save()
+                for obj in establecimientos_formset.deleted_objects:
+                    obj.delete()
+        else:
+            # Clonar representantes al nuevo RIT
+            orden = 0
+            for data in representantes_formset.cleaned_data:
+                if not data or data.get('DELETE'):
+                    continue
+                if not data.get('nombre'):
+                    continue
+                orden += 1
+                RepresentanteLegalRIT.objects.create(
+                    rit=rit,
+                    tipo_representante=data.get('tipo_representante') or 'REPRESENTANTE_LEGAL',
+                    nombre=data['nombre'],
+                    tipo_documento=data.get('tipo_documento') or 'CC',
+                    numero_documento=data.get('numero_documento') or '',
+                    correo_electronico=data.get('correo_electronico') or '',
+                    orden=orden,
+                )
+
+            # Clonar establecimientos (solo si tiene_establecimientos)
+            if rit.tiene_establecimientos:
+                orden = 0
+                for data in establecimientos_formset.cleaned_data:
+                    if not data or data.get('DELETE'):
+                        continue
+                    if not data.get('nombre'):
+                        continue
+                    orden += 1
+                    EstablecimientoRIT.objects.create(
+                        rit=rit,
+                        nombre=data['nombre'],
+                        direccion=data.get('direccion') or '',
+                        telefono=data.get('telefono') or '',
+                        fecha_inicio_actividades=data.get('fecha_inicio_actividades'),
+                        tiene_avisos_tableros=bool(data.get('tiene_avisos_tableros')),
+                        fecha_cancelacion=data.get('fecha_cancelacion'),
+                        orden=orden,
+                    )
+
+        # ===== ACTIVIDADES CIIU POR ESTABLECIMIENTO =====
+        from catalogos.models import ActividadEconomica
+        rit.actividades_rit.all().delete()
+        est_objs = list(rit.establecimientos.order_by('orden', 'id'))
+        orden = 0
+        for grp in actividades_data:
+            if not isinstance(grp, dict):
+                continue
+            est_idx = grp.get('est')
+            est_obj = None
+            if isinstance(est_idx, int) and 0 <= est_idx < len(est_objs):
+                est_obj = est_objs[est_idx]
+            for act_id in (grp.get('actividades') or []):
+                try:
+                    act_pk = int(act_id)
+                except (ValueError, TypeError):
+                    continue
+                if not ActividadEconomica.objects.filter(pk=act_pk).exists():
+                    continue
+                orden += 1
+                ActividadEconomicaRIT.objects.create(
+                    rit=rit,
+                    establecimiento=est_obj,
+                    actividad_id=act_pk,
+                    orden=orden,
+                )
 
         # ===== FIRMA ELECTRÓNICA OTP =====
-        # Invalidar OTPs anteriores de este registro
         FirmaOTPRIT.objects.filter(registro=rit, usado=False).update(usado=True)
 
-        # Generar y enviar OTP al declarante
         email_destino = request.user.email or getattr(perfil, 'correo_electronico', None)
         nombre = getattr(perfil, 'nombre_razon_social', request.user.get_full_name()) or request.user.username
         otp_code = ''.join(random.choices('0123456789', k=6))
@@ -1305,12 +1365,16 @@ def proceso_rit(request):
         errores.append(f"Representantes: {representantes_formset.errors}")
     if establecimientos_formset.errors:
         errores.append(f"Establecimientos: {establecimientos_formset.errors}")
-    if actividades_formset.errors:
-        errores.append(f"Actividades: {actividades_formset.errors}")
+    if not actividades_valido:
+        errores.append("Actividades: debe registrar al menos 1 actividad económica.")
+        messages.error(request, 'Debe registrar al menos una actividad económica (CIIU).')
 
     print("=== ERRORES RIT ===")
     for e in errores:
         print(e)
+
+    from catalogos.models import ActividadEconomica as _AECat
+    actividades_catalogo = _AECat.objects.filter(activo=True).order_by('codigo')
 
     messages.error(request, 'Por favor corrija los errores en el formulario.')
     return render(request, "formularios/rit.html", {
@@ -1319,7 +1383,9 @@ def proceso_rit(request):
         "municipios_json": municipios_json,
         "representantes_formset": representantes_formset,
         "establecimientos_formset": establecimientos_formset,
-        "actividades_formset": actividades_formset,
+        "actividades_catalogo": actividades_catalogo,
+        "actividad_inicial_id": None,
+        "actividades_json_prev": request.POST.get('actividades_json', ''),
         "opcion_uso": opcion_uso,
     })
 
