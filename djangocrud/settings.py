@@ -45,6 +45,9 @@ CSRF_TRUSTED_ORIGINS = [
     'https://www.salgar.portalterritorial.com.co',
 ]
 
+# Permitir previsualización de PDFs en iframes del mismo dominio
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
 
 # Application definition
 
