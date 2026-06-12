@@ -1,0 +1,700 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-4" style="max-width:1200px;">
+
+  <!-- Title -->
+  <div class="text-center mb-4">
+    <h2 class="fw-bold" style="color:#4B5563;">DECLARACIÓN BIMESTRAL DE RETENCIÓN DEL IMPUESTO DE INDUSTRIA Y COMERCIO</h2>
+    <p class="text-muted">Municipio de Salgar - Antioquia</p>
+  </div>
+
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  {% if form.errors %}
+    <div class="alert alert-danger">
+      <strong>Por favor corrija los siguientes errores:</strong>
+      <ul class="mb-0 mt-1">
+        {% for field, errs in form.errors.items %}
+          {% for e in errs %}<li>{{ field }}: {{ e }}</li>{% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {% if errores_actividades %}
+    <div class="alert alert-danger">
+      {% for e in errores_actividades %}<div>{{ e }}</div>{% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" id="form-rete">
+    {% csrf_token %}
+    {% if editar_id %}<input type="hidden" name="editar_id" value="{{ editar_id }}">{% endif %}
+
+    <!-- ===== DATOS GENERALES ===== -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Municipio:</label>
+            {{ form.municipio }}
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-semibold">Año gravable</label>
+            {{ form.anio_gravable }}
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-semibold">Bimestre</label>
+            {{ form.bimestre }}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Opcion uso:</label>
+            {{ form.opcion_uso }}
+          </div>
+        </div>
+        <div class="row g-3 mt-1" id="correccion_wrap" style="display:none;">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Declaración que corrige:</label>
+            {{ form.corrige_a }}
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Departamento</label>
+            <input type="text" id="depto_display" class="form-control" readonly value="">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== A. INFORMACIÓN DEL CONTRIBUYENTE ===== -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header text-white fw-bold" style="background:#222;">A. INFORMACIÓN DEL CONTRIBUYENTE</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-5">
+            <label class="form-label">1. Nombres y apellidos o razón social:</label>
+            {{ form.nombre_razon_social }}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">2. Tipo de documento:</label>
+            {{ form.tipo_documento }}
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">No. documento:</label>
+            {{ form.numero_documento }}
+          </div>
+          <div class="col-md-1" id="dv_wrap">
+            <label class="form-label">DV:</label>
+            {{ form.dv }}
+          </div>
+          <div class="col-md-3" id="cual_doc_wrap" style="display:none;">
+            <label class="form-label">¿Cuál?:</label>
+            {{ form.cual_documento }}
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-4">
+            <label class="form-label">3. Dirección de notificación:</label>
+            {{ form.direccion_notificacion }}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">3.1. MUNICIPIO O DISTRITO DE LA DIRECCIÓN DE NOTIFICACIÓN:</label>
+            {{ form.municipio_notificacion }}
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">3.2. DEPARTAMENTO:</label>
+            <input type="text" id="depto_notif_display" class="form-control" readonly value="">
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-2">
+            <label class="form-label">4. Teléfono:</label>
+            {{ form.telefono }}
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">5. Correo electrónico:</label>
+            {{ form.correo_electronico }}
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">6. Número de establecimientos:</label>
+            {{ form.numero_establecimientos }}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">7. Clasificación contribuyente:</label>
+            {{ form.clasificacion_contribuyente }}
+          </div>
+          <div class="col-md-3" id="otra_clasificacion_wrap" style="display:none;">
+            {{ form.otra_clasificacion }}
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-4">
+            <label class="form-label">Tipo persona:</label>
+            {{ form.tipo_persona }}
+          </div>
+          <div class="col-md-4" id="bloque-juridica" style="display:none;">
+            <label class="form-label">Tipo jurídica:</label>
+            {{ form.tipo_juridica }}
+          </div>
+          <div class="col-md-4" id="otro_juridica_wrap" style="display:none;">
+            <label class="form-label">¿Cuál?:</label>
+            {{ form.otro_tipo_juridica }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== LIQUIDACIÓN DE ACTIVIDADES ===== -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header text-white fw-bold" style="background:var(--verde);">
+        <i class="bi bi-table me-1"></i> LIQUIDACIÓN DE ACTIVIDADES
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover mb-0" id="tabla-actividades">
+            <thead style="background:var(--verde); color:#fff;" class="text-center">
+              <tr>
+                <th style="width:40px;" class="align-middle">#</th>
+                <th style="min-width:280px;" class="align-middle">Actividad económica</th>
+                <th style="min-width:140px;" class="align-middle"
+                    title="Valor base sujeto a retención">
+                  Valor Base
+                </th>
+                <th style="min-width:100px;" class="align-middle"
+                    title="Tarifa por mil">
+                  Tarifa<br><small class="fw-normal opacity-75">x mil</small>
+                </th>
+                <th style="min-width:140px;" class="align-middle"
+                    title="Valor Retención = Valor Base × Tarifa / 1000">
+                  Valor<br><small class="fw-normal opacity-75">Retención</small>
+                </th>
+                <th style="width:60px;" class="align-middle"></th>
+              </tr>
+            </thead>
+            <tbody id="actividades-body">
+              <!-- Filled by JS -->
+            </tbody>
+            <tfoot>
+              <tr class="table-secondary fw-bold text-end">
+                <td colspan="4" class="text-start ps-3">
+                  <i class="bi bi-calculator me-1"></i> Total
+                </td>
+                <td>
+                  <input type="text" id="total_valor_retencion" class="form-control form-control-sm text-end fw-bold" readonly value="0"
+                    style="background:#d4edda; color:#155724;">
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div class="p-3 border-top bg-light d-flex align-items-center gap-3">
+          <button type="button" class="btn btn-primary btn-sm" id="btn-agregar">
+            <i class="bi bi-plus-circle me-1"></i>Agregar actividad
+          </button>
+          <span class="text-muted small">Mínimo 1 y máximo 15 actividades económicas</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== D. LIQUIDACIÓN DEL IMPUESTO ===== -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header text-white fw-bold" style="background:var(--verde);">
+        <i class="bi bi-calculator me-1"></i> D. LIQUIDACIÓN DEL IMPUESTO
+      </div>
+      <div class="card-body">
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-bold">TOTAL RETENCIONES</label>
+            <input type="text" id="d_total_retenciones" class="form-control fw-bold bg-light" readonly value="0">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">
+              DEVOLUCIONES, ANULACIONES, RESCISIONES, RETENCIONES PRACTICADAS EN EXCESO
+            </label>
+            {{ form.devoluciones }}
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-12">
+            <label class="form-label fw-bold">
+              SUBTOTAL RETENCIONES PRACTICADAS MENOS DEVOLUCIONES, ANULACIONES, RESCISIONES Y RETENCIONES PRACTICADAS EN EXCESO
+            </label>
+            <input type="text" id="subtotal_retenciones_display" class="form-control fw-bold bg-light" readonly value="0">
+          </div>
+        </div>
+
+        <div class="row g-3 mb-1 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">SANCIONES</label>
+            {{ form.tipo_sancion }}
+          </div>
+          <div class="col-md-3" id="cual_sancion_wrap" style="display:none;">
+            <label class="form-label">¿Cuál?</label>
+            {{ form.cual_sancion }}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Valor sanción ($)</label>
+            {{ form.sanciones }}
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">INTERESES DE MORA</label>
+            {{ form.intereses_mora }}
+          </div>
+        </div>
+
+        <hr>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-bold fs-6" style="color:var(--verde);">TOTAL A PAGAR (Subtotal + Sanciones + Intereses)</label>
+            <input type="text" id="total_a_pagar_display" class="form-control fw-bold fs-5"
+                   style="background:#d4edda; color:#155724; border-color:#c3e6cb;" readonly value="0">
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ===== F. FIRMAS ===== -->
+    <div class="card mb-3">
+      <div class="card-header bg-dark text-white">F. Firmas</div>
+      <div class="card-body">
+
+        {% if not es_alcaldia %}
+        <div class="row mb-4">
+          <div class="col-md-8">
+            <div class="alert alert-success mb-0 d-flex align-items-start gap-3">
+              <span style="font-size:2rem;">✉️</span>
+              <div>
+                <strong>Firma electrónica por código de verificación</strong><br>
+                <span class="text-muted small">
+                  Al hacer clic en <em>"Terminar declaración"</em>, se enviará un código de 6 dígitos
+                  a su correo registrado. Deberá ingresarlo para firmar y confirmar la declaración (Ley 527 de 1999).
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <div id="bloque-rep-legal">
+          <hr>
+          <div class="row mb-2">
+            <div class="col-md-12"><strong>Representante legal</strong></div>
+          </div>
+          {% if not es_alcaldia %}
+          <div class="row mb-3">
+            <div class="col-md-8">
+              <div class="alert alert-success mb-0 d-flex align-items-start gap-3">
+                <span style="font-size:2rem;">✉️</span>
+                <div>
+                  <strong>Firma electrónica del representante legal</strong>
+                  <div class="mt-2">
+                    <label class="form-label mb-1"><strong>Correo del representante legal *</strong></label>
+                    {{ form.rep_legal_email }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Nombre del representante legal</label>
+              {{ form.rep_legal_nombre }}
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Tipo doc.</label>
+              {{ form.rep_legal_tipo_documento }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Número documento</label>
+              {{ form.rep_legal_numero_documento }}
+            </div>
+          </div>
+        </div>
+
+        <hr>
+
+        <div class="row mb-2">
+          <div class="col-md-12">
+            <div class="form-check">
+              {{ form.tiene_contador }}
+              <label class="form-check-label" for="id_tiene_contador">
+                <strong>Obligado a llevar contabilidad</strong>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div id="bloque-contador" style="display:none;">
+          {% if not es_alcaldia %}
+          <div class="row mb-3">
+            <div class="col-md-8">
+              <div class="alert alert-info mb-0 d-flex align-items-start gap-3">
+                <span style="font-size:2rem;">✉️</span>
+                <div>
+                  <strong>Firma electrónica del contador</strong>
+                  <div class="mt-2">
+                    <label class="form-label mb-1"><strong>Correo del contador *</strong></label>
+                    {{ form.contador_email }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Nombre del contador</label>
+              {{ form.contador_nombre }}
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Tipo doc.</label>
+              {{ form.contador_tipo_documento }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Número documento</label>
+              {{ form.contador_numero_documento }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Tarjeta profesional (T.P.)</label>
+              {{ form.contador_tarjeta_profesional }}
+            </div>
+          </div>
+        </div>
+
+        <hr>
+
+        <div class="row mb-2">
+          <div class="col-md-12">
+            <div class="form-check">
+              {{ form.tiene_revisor_fiscal }}
+              <label class="form-check-label" for="id_tiene_revisor_fiscal">
+                <strong>Obligado a llevar revisoría fiscal</strong>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div id="bloque-revisor" style="display:none;">
+          {% if not es_alcaldia %}
+          <div class="row mb-3">
+            <div class="col-md-8">
+              <div class="alert alert-info mb-0 d-flex align-items-start gap-3">
+                <span style="font-size:2rem;">✉️</span>
+                <div>
+                  <strong>Firma electrónica del revisor fiscal</strong>
+                  <div class="mt-2">
+                    <label class="form-label mb-1"><strong>Correo del revisor fiscal *</strong></label>
+                    {{ form.revisor_email }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Nombre del revisor fiscal</label>
+              {{ form.revisor_nombre }}
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Tipo doc.</label>
+              {{ form.revisor_tipo_documento }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Número documento</label>
+              {{ form.revisor_numero_documento }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Tarjeta profesional (T.P.)</label>
+              {{ form.revisor_tarjeta_profesional }}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="text-center mb-5">
+      <button type="submit" class="btn btn-success btn-lg" id="btn-terminar">
+        <i class="bi bi-check-circle me-2"></i>Terminar declaración
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Row template (hidden) -->
+<template id="tpl-fila-actividad">
+  <tr class="fila-actividad">
+    <td class="text-center num-fila fw-bold"></td>
+    <td>
+      <select class="form-select form-select-sm select-actividad" name="actividad_select_IDX">
+        <option value="">----------</option>
+        {% for a in actividades_opciones %}<option value="{{ a.id }}" data-tarifa="{{ a.tarifa }}">{{ a.codigo }} - {{ a.nombre }}</option>{% endfor %}
+      </select>
+      <input type="hidden" class="actividad-id-input" name="actividad_id_IDX">
+    </td>
+    <td><input type="text" class="form-control form-control-sm valor-base" name="valor_base_IDX" value="0" placeholder="0"></td>
+    <td><input type="text" class="form-control form-control-sm tarifa-input" name="tarifa_IDX" value="0" placeholder="0"></td>
+    <td><input type="text" class="form-control form-control-sm valor-retencion" readonly value="0"></td>
+    <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger btn-eliminar">Eliminar</button></td>
+  </tr>
+</template>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+const TARIFAS = {{ tarifas_json|safe }};
+const MUN_DEPTO = {{ mun_depto_json|safe }};
+const BIMESTRES_CON_INICIAL = {{ bimestres_con_inicial_json|safe }};
+const DECLARACIONES_ANTERIORES = {{ declaraciones_anteriores|safe }};
+
+function fmtCO(n) {
+  if (isNaN(n) || n === '' || n === null) return '0';
+  return Math.round(Number(n)).toLocaleString('es-CO');
+}
+function parseCO(s) {
+  if (!s) return 0;
+  return parseInt(String(s).replace(/\./g, '').replace(/,/g, '').trim()) || 0;
+}
+function parseTarifa(s) {
+  if (!s) return 0;
+  return parseFloat(String(s).replace(',', '.').trim()) || 0;
+}
+function formatInputCO(input) {
+  let raw = parseCO(input.value);
+  input.value = fmtCO(raw);
+}
+
+function updateDepto() {
+  const munId = parseInt($('#id_municipio').val()) || 0;
+  $('#depto_display').val(munId && MUN_DEPTO[munId] ? MUN_DEPTO[munId] : '');
+}
+function updateDeptoNotif() {
+  const munId = parseInt($('#id_municipio_notificacion').val()) || 0;
+  $('#depto_notif_display').val(munId && MUN_DEPTO[munId] ? MUN_DEPTO[munId] : '');
+}
+
+function toggleCorreccion() {
+  const val = $('#id_opcion_uso').val();
+  $('#correccion_wrap').toggle(val === 'CORRECCION');
+  if (val === 'CORRECCION') populateCorreccionSelect();
+}
+function populateCorreccionSelect() {
+  const sel = $('#id_corrige_a');
+  const current = sel.val();
+  sel.find('option:not(:first)').remove();
+  DECLARACIONES_ANTERIORES.forEach(d => {
+    const label = 'Año ' + d.anio_gravable + ' - Bim ' + d.bimestre + ' (' + d.opcion_uso + ')';
+    sel.append($('<option>').val(d.id).text(label));
+  });
+  if (current) sel.val(current);
+}
+function toggleDV() {
+  $('#dv_wrap').toggle($('#id_tipo_documento').val() === 'NIT');
+  $('#cual_doc_wrap').toggle($('#id_tipo_documento').val() === 'OTRO');
+}
+function toggleJuridica() {
+  const isJ = $('#id_tipo_persona').val() === 'JURIDICA';
+  $('#bloque-juridica').toggle(isJ);
+  $('#otro_juridica_wrap').toggle(isJ && $('#id_tipo_juridica').val() === 'OTRO');
+}
+function toggleOtraClasificacion() {
+  $('#otra_clasificacion_wrap').toggle($('#id_clasificacion_contribuyente').val() === 'OTRA');
+}
+function toggleContador() {
+  $('#bloque-contador').toggle($('#id_tiene_contador').is(':checked'));
+}
+function toggleRevisor() {
+  $('#bloque-revisor').toggle($('#id_tiene_revisor_fiscal').is(':checked'));
+}
+function toggleCualSancion() {
+  $('#cual_sancion_wrap').toggle($('#id_tipo_sancion').val() === 'OTRA');
+}
+
+let rowCount = 0;
+
+function calcRow(tr) {
+  const valorBase = parseCO(tr.find('.valor-base').val());
+  const tarifa = parseTarifa(tr.find('.tarifa-input').val());
+  const valor = Math.round(valorBase * tarifa / 1000);
+  tr.find('.valor-retencion').val(fmtCO(valor));
+  recalcTotals();
+}
+
+function recalcTotals() {
+  let totalValor = 0;
+  $('#actividades-body .fila-actividad').each(function() {
+    totalValor += parseCO($(this).find('.valor-retencion').val());
+  });
+  $('#total_valor_retencion').val(fmtCO(totalValor));
+  recalcLiquidacion();
+}
+
+function recalcLiquidacion() {
+  const totalRet = parseCO($('#total_valor_retencion').val());
+  $('#d_total_retenciones').val(fmtCO(totalRet));
+  const devol = parseCO($('#id_devoluciones').val());
+  const subtotalRet = Math.max(0, totalRet - devol);
+  $('#subtotal_retenciones_display').val(fmtCO(subtotalRet));
+  const sanciones = parseCO($('#id_sanciones').val());
+  const intereses = parseCO($('#id_intereses_mora').val());
+  const totalPagar = subtotalRet + sanciones + intereses;
+  $('#total_a_pagar_display').val(fmtCO(totalPagar));
+}
+
+function addRow(actividadId, valorBase, tarifa) {
+  const tbody = $('#actividades-body');
+  if (tbody.find('.fila-actividad').length >= 15) return;
+
+  const tpl = document.getElementById('tpl-fila-actividad').innerHTML;
+  const idx = rowCount++;
+  const html = tpl.replace(/IDX/g, idx);
+  tbody.append(html);
+
+  const tr = tbody.find('.fila-actividad:last');
+  renumberRows();
+
+  const sel = tr.find('.select-actividad');
+  sel.select2({ width: '100%', placeholder: '----------' });
+
+  if (actividadId) {
+    sel.val(actividadId).trigger('change.select2');
+    tr.find('.actividad-id-input').val(actividadId);
+    tr.find('.valor-base').val(fmtCO(valorBase || 0));
+    tr.find('.tarifa-input').val(tarifa || 0);
+    calcRow(tr);
+  }
+
+  sel.on('change', function() {
+    const val = $(this).val();
+    tr.find('.actividad-id-input').val(val || '');
+    if (val && TARIFAS[val] && !parseTarifa(tr.find('.tarifa-input').val())) {
+      tr.find('.tarifa-input').val(TARIFAS[val].tarifa);
+    }
+    calcRow(tr);
+  });
+
+  tr.find('.valor-base, .tarifa-input').on('input change', function() {
+    calcRow(tr);
+  });
+  tr.find('.valor-base').on('blur', function() {
+    formatInputCO(this);
+    calcRow(tr);
+  });
+
+  tr.find('.btn-eliminar').on('click', function() {
+    if ($('#actividades-body .fila-actividad').length <= 1) {
+      alert('Debe tener al menos 1 actividad.');
+      return;
+    }
+    tr.remove();
+    renumberRows();
+    recalcTotals();
+  });
+}
+
+function renumberRows() {
+  $('#actividades-body .fila-actividad').each(function(i) {
+    $(this).find('.num-fila').text(i + 1);
+    $(this).find('input, select').each(function() {
+      const name = $(this).attr('name');
+      if (name) {
+        $(this).attr('name', name.replace(/_\d+$/, '_' + i));
+      }
+    });
+  });
+}
+
+function validarBimestreInicial() {
+  const opcion = $('#id_opcion_uso').val();
+  const anio = parseInt($('#id_anio_gravable').val()) || 0;
+  const bim = $('#id_bimestre').val();
+  if (opcion !== 'INICIAL' || !anio || !bim) return true;
+  const existe = BIMESTRES_CON_INICIAL.some(function(x) { return x.anio === anio && x.bimestre === bim; });
+  if (existe) {
+    alert('Ya existe una declaración inicial firmada para el Bimestre ' + bim + ' del año ' + anio + '.');
+    return false;
+  }
+  return true;
+}
+
+$(document).ready(function() {
+  $('.select2-municipio').select2({ width: '100%', placeholder: 'Escribe o pega un municipio...' });
+  $('.select2-municipio-notif').select2({ width: '100%', placeholder: 'Escribe o pega un municipio...' });
+
+  $('#id_municipio').on('change', updateDepto);
+  $('#id_municipio_notificacion').on('change', updateDeptoNotif);
+  $('#id_opcion_uso').on('change', toggleCorreccion);
+  $('#id_tipo_documento').on('change', toggleDV);
+  $('#id_tipo_persona').on('change', toggleJuridica);
+  $('#id_tipo_juridica').on('change', toggleJuridica);
+  $('#id_clasificacion_contribuyente').on('change', toggleOtraClasificacion);
+  $('#id_tiene_contador').on('change', toggleContador);
+  $('#id_tiene_revisor_fiscal').on('change', toggleRevisor);
+  $('#id_devoluciones, #id_sanciones, #id_intereses_mora').on('input change', recalcLiquidacion);
+  $('#id_devoluciones, #id_sanciones, #id_intereses_mora').on('blur', function() { formatInputCO(this); recalcLiquidacion(); });
+  $('#id_tipo_sancion').on('change', toggleCualSancion);
+  toggleCualSancion();
+
+  $('#btn-agregar').on('click', function() { addRow(); });
+
+  toggleCorreccion();
+  toggleDV();
+  toggleJuridica();
+  toggleOtraClasificacion();
+  toggleContador();
+  toggleRevisor();
+  updateDepto();
+  updateDeptoNotif();
+
+  var actividadesExistentes = {{ actividades_existentes_json|default:"[]"|safe }};
+  if (actividadesExistentes.length > 0) {
+    actividadesExistentes.forEach(function(a) {
+      addRow(a.actividad_id, a.valor_base, a.tarifa);
+    });
+  } else {
+    addRow();
+  }
+
+  $('#form-rete').on('submit', function(e) {
+    if (!validarBimestreInicial()) { e.preventDefault(); return; }
+    const rows = $('#actividades-body .fila-actividad');
+    if (rows.length === 0) { e.preventDefault(); alert('Debe agregar al menos una actividad.'); return; }
+    let valid = true;
+    rows.each(function() {
+      if (!$(this).find('.actividad-id-input').val()) {
+        valid = false;
+      }
+    });
+    if (!valid) { e.preventDefault(); alert('Seleccione la actividad económica en todas las filas.'); return; }
+
+    $('#id_devoluciones, #id_sanciones, #id_intereses_mora').each(function() {
+      $(this).val(parseCO($(this).val()));
+    });
+    rows.each(function() {
+      $(this).find('.valor-base').val(parseCO($(this).find('.valor-base').val()));
+    });
+  });
+});
+</script>
+{% endblock %}

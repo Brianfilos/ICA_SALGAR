@@ -260,6 +260,62 @@
     </div>
   {% endif %}
 
+  {% if retes %}
+    <div class="card shadow-sm mb-4">
+      <div class="card-header text-white" style="background-color:#7b2d82;">
+        <i class="bi bi-arrow-down-up"></i> Declaraciones Retención ICA (RETE)
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Fecha</th>
+                <th>Año / Bimestre</th>
+                <th>Documento</th>
+                <th>Municipio</th>
+                <th>Total a Pagar</th>
+                <th>Opción</th>
+                {% if is_admin %}<th>Usuario</th>{% endif %}
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for rete in retes %}
+                <tr>
+                  <td>{{ rete.fecha_diligenciamiento|date:"Y-m-d H:i" }}</td>
+                  <td>{{ rete.anio_gravable }} / {{ rete.get_bimestre_display }}</td>
+                  <td>{{ rete.tipo_documento }} {{ rete.numero_documento }}</td>
+                  <td>{{ rete.municipio.nombre }}</td>
+                  <td class="text-end">${{ rete.total_a_pagar|floatformat:0 }}</td>
+                  <td>
+                    <span class="badge {% if rete.opcion_uso == 'INICIAL' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                      {{ rete.get_opcion_uso_display }}
+                    </span>
+                  </td>
+                  {% if puede_ver_todo %}<td>{{ rete.user.username }}</td>{% endif %}
+                  <td>
+                    {% if rete.firma_otp_verificada %}
+                      <button onclick="previewPDF('{% url 'pdf_rete' rete.id %}')" class="btn btn-sm btn-outline-danger" title="Ver PDF">
+                        <i class="bi bi-file-pdf"></i> PDF
+                      </button>
+                    {% elif puede_ver_todo %}
+                      <span class="badge bg-warning text-dark">Pendiente firma</span>
+                    {% else %}
+                      <a href="{% url 'proceso_rete' %}?editar={{ rete.id }}" class="btn btn-sm btn-warning text-dark">
+                        <i class="bi bi-pencil-square"></i> Terminar declaración
+                      </a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
   <!-- Tabla de Visitas RIT Móvil (solo para funcionarios/admin, no para contribuyentes) -->
   {% if visitas and not es_contribuyente %}
     <div class="card shadow-sm mb-4">
@@ -357,7 +413,7 @@
     </div>
   {% endif %}
 
-  {% if not rits and not icas and not autos and not visitas %}
+  {% if not rits and not icas and not autos and not retes and not visitas %}
     <div class="alert alert-info">
       <i class="bi bi-info-circle"></i> No hay procesos completados todavía.
     </div>

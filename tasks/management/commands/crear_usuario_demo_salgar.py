@@ -66,18 +66,24 @@ class Command(BaseCommand):
         else:
             self.stdout.write('Advertencia: sin municipio — perfil no creado')
 
-        # Habilitar todos los procesos
-        for codigo in ('RIT', 'ICA', 'AUTO', 'RETE'):
-            try:
-                proceso = Proceso.objects.get(codigo=codigo)
-                acceso, _ = AccesoProceso.objects.get_or_create(
-                    user=user, proceso=proceso, defaults={'habilitado': True}
-                )
-                acceso.habilitado = True
-                acceso.save()
-                self.stdout.write(f'Acceso {codigo}: OK')
-            except Proceso.DoesNotExist:
-                self.stdout.write(f'Advertencia: proceso {codigo} no existe en BD')
+        # Habilitar todos los procesos (creándolos si no existen)
+        nombres_procesos = {
+            'RIT': 'Registro de Información Tributaria',
+            'ICA': 'Declaración de Industria y Comercio',
+            'AUTO': 'Declaración de Autorretención ICA',
+            'RETE': 'Declaración de Retención ICA',
+        }
+        for codigo, nombre in nombres_procesos.items():
+            proceso, _ = Proceso.objects.get_or_create(
+                codigo=codigo,
+                defaults={'nombre': nombre}
+            )
+            acceso, _ = AccesoProceso.objects.get_or_create(
+                user=user, proceso=proceso, defaults={'habilitado': True}
+            )
+            acceso.habilitado = True
+            acceso.save()
+            self.stdout.write(f'Acceso {codigo}: OK')
 
         accion = 'Creado' if created else 'Actualizado'
         self.stdout.write(self.style.SUCCESS(

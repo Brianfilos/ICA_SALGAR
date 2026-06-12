@@ -1337,10 +1337,165 @@ class DeclaracionActividadAutoForm(forms.Form):
 
 
 class ReteForm(forms.ModelForm):
+    """Formulario para Declaración Bimestral de Retención ICA."""
+
+    sanciones = forms.CharField(required=False, initial='0')
+    intereses_mora = forms.CharField(required=False, initial='0')
+    devoluciones = forms.CharField(required=False, initial='0')
+
+    tipo_sancion = forms.ChoiceField(
+        choices=[
+            ("NINGUNA", "Ninguna"),
+            ("EXTEMPORANEIDAD", "Extemporaneidad"),
+            ("CORRECCION", "Corrección"),
+            ("INEXACTITUD", "Inexactitud"),
+            ("OTRA", "Otra"),
+        ],
+        required=False,
+        initial="NINGUNA",
+    )
+    cual_sancion = forms.CharField(required=False, max_length=100)
+
     class Meta:
-        model = RetencionICA
-        fields = "__all__"
-        exclude = ["user", "fecha"]
+        from .models import DeclaracionRetencionICA as _Mod
+        model = _Mod
+        exclude = [
+            'user', 'fecha_diligenciamiento', 'created_at',
+            'total_valor_retencion', 'subtotal_retenciones', 'total_a_pagar',
+            'departamento',
+            'contador_firma_verificada', 'revisor_firma_verificada',
+            'firma_otp_verificada', 'firma_timestamp', 'firma_hash',
+        ]
+
+    def __init__(self, *args, **kwargs):
+        self.perfil = kwargs.pop('perfil', None)
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        from catalogos.models import Municipio
+        from .models import DeclaracionRetencionICA as _Mod
+        municipios = Municipio.objects.select_related('departamento').order_by('nombre')
+        choices_mun = [('', 'Escribe o pega un municipio...')] + [(m.id, m.nombre) for m in municipios]
+        self.fields['municipio'].widget = forms.Select(attrs={'class': 'form-select select2-municipio'})
+        self.fields['municipio'].choices = choices_mun
+        self.fields['municipio_notificacion'].widget = forms.Select(attrs={'class': 'form-select select2-municipio-notif'})
+        self.fields['municipio_notificacion'].choices = choices_mun
+        self.fields['municipio_notificacion'].required = False
+
+        if self.user:
+            self.fields['corrige_a'].queryset = _Mod.objects.filter(
+                user=self.user, firma_otp_verificada=True
+            ).order_by('-anio_gravable', '-bimestre')
+        else:
+            self.fields['corrige_a'].queryset = _Mod.objects.none()
+        self.fields['corrige_a'].required = False
+
+        for fname, field in self.fields.items():
+            w = field.widget
+            if isinstance(w, forms.Select):
+                w.attrs.setdefault('class', 'form-select')
+            elif isinstance(w, forms.CheckboxInput):
+                w.attrs.setdefault('class', 'form-check-input')
+            else:
+                w.attrs.setdefault('class', 'form-control')
+
+        if self.perfil and not self.instance.pk:
+            p = self.perfil
+            self.fields['nombre_razon_social'].initial = p.nombre_razon_social or ''
+            self.fields['tipo_documento'].initial = p.tipo_documento or ''
+            self.fields['numero_documento'].initial = p.numero_documento or ''
+            self.fields['dv'].initial = p.dv or ''
+            self.fields['direccion_notificacion'].initial = p.direccion_notificacion or ''
+            self.fields['municipio_notificacion'].initial = p.municipio_notificacion_id or ''
+            self.fields['telefono'].initial = p.telefono or ''
+            self.fields['correo_electronico'].initial = p.correo_electronico or ''
+            self.fields['tipo_persona'].initial = p.tipo_persona or ''
+            self.fields['clasificacion_contribuyente'].initial = p.clasificacion_contribuyente or ''
+
+    def _parse_money(self, value):
+        if not value:
+            return 0
+        cleaned = str(value).replace('.', '').replace(',', '').replace(' ', '').strip()
+        try:
+            return int(cleaned)
+        except (ValueError, TypeError):
+            return 0
+
+    def clean_anio_gravable(self):
+        val = self.cleaned_data.get('anio_gravable')
+        if val and (val < 2000 or val > 2099):
+            raise forms.ValidationError('El año gravable debe estar entre 2000 y 2099.')
+        return val
+
+    def clean_telefono(self):
+        val = self.cleaned_data.get('telefono', '') or ''
+        digits = val.replace(' ', '').replace('-', '')
+        if digits and len(digits) != 10:
+            raise forms.ValidationError('El teléfono debe tener exactamente 10 dígitos.')
+        return digits
+
+    def clean_corrige_a(self):
+        opcion = self.cleaned_data.get('opcion_uso')
+        corrige = self.cleaned_data.get('corrige_a')
+        if opcion == 'CORRECCION' and not corrige:
+            raise forms.ValidationError('Debe seleccionar la declaración que corrige.')
+        return corrige
+
+    def clean_sanciones(self):
+        return self._parse_money(self.cleaned_data.get('sanciones'))
+
+    def clean_intereses_mora(self):
+        return self._parse_money(self.cleaned_data.get('intereses_mora'))
+
+    def clean_devoluciones(self):
+        return self._parse_money(self.cleaned_data.get('devoluciones'))
+
+    def clean(self):
+        cleaned = super().clean()
+        from .models import DeclaracionRetencionICA as _Mod
+        opcion = cleaned.get('opcion_uso')
+        anio = cleaned.get('anio_gravable')
+        bimestre = cleaned.get('bimestre')
+        if opcion == 'INICIAL' and anio and bimestre and self.user:
+            qs = _Mod.objects.filter(
+                user=self.user, anio_gravable=anio, bimestre=bimestre, opcion_uso='INICIAL',
+                firma_otp_verificada=True,
+            )
+            if self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError(
+                    f'Ya existe una declaración inicial firmada para el Bimestre {bimestre} del año {anio}.'
+                )
+        return cleaned
+
+
+class DeclaracionActividadReteForm(forms.Form):
+    actividad_id = forms.IntegerField(widget=forms.HiddenInput(), required=False)
+    valor_base = forms.CharField(required=False, initial='0')
+    tarifa = forms.CharField(required=False, initial='0')
+
+    def _parse_money(self, val):
+        if not val:
+            return 0
+        try:
+            return int(str(val).replace('.', '').replace(',', '').strip())
+        except (ValueError, TypeError):
+            return 0
+
+    def _parse_tarifa(self, val):
+        if not val:
+            return 0
+        try:
+            return float(str(val).replace(',', '.').strip())
+        except (ValueError, TypeError):
+            return 0
+
+    def clean_valor_base(self):
+        return self._parse_money(self.cleaned_data.get('valor_base'))
+
+    def clean_tarifa(self):
+        return self._parse_tarifa(self.cleaned_data.get('tarifa'))
 
 
 # -------------------------

@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card shadow">
+        <div class="card-header text-white fw-bold" style="background:#4B5563;">
+          <i class="bi bi-shield-lock me-2"></i>Firma Electrónica - Retención ICA
+        </div>
+        <div class="card-body p-4">
+          {% if mensaje %}
+            <div class="alert alert-success">{{ mensaje }}</div>
+          {% endif %}
+          {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+          {% endif %}
+
+          <p class="mb-1">Se envió un código OTP a:</p>
+          <p class="fw-bold text-primary">{{ email_mostrar }}</p>
+          <p class="text-muted small mb-4">Firmando como: <strong>{{ nombre_mostrar }}</strong> ({{ paso_actual }})</p>
+
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="verificar">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Código OTP (6 dígitos):</label>
+              <input type="text" name="codigo" class="form-control form-control-lg text-center"
+                     maxlength="6" autocomplete="one-time-code" autofocus
+                     style="letter-spacing:8px;font-size:1.5rem;">
+            </div>
+            <div class="d-grid mb-3">
+              <button type="submit" class="btn btn-success btn-lg">Verificar y Firmar</button>
+            </div>
+          </form>
+
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reenviar">
+            <div class="d-grid">
+              <button type="submit" class="btn btn-outline-secondary btn-sm">Reenviar código</button>
+            </div>
+          </form>
+
+          <hr>
+          <a href="{% url 'tasks' %}" class="text-muted small">Volver a mis trámites</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

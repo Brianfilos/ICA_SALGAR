@@ -689,31 +689,37 @@ def tasks_completed(request):
     filtro_documento = request.GET.get('documento', '').strip()
     filtro_proceso   = request.GET.get('proceso', '')
 
+    from .models import DeclaracionRetencionICA
     if puede_ver_todo:
         rits    = RegistroRIT.objects.select_related('user', 'municipio_notificacion').order_by('-fecha')
         icas    = DeclaracionICA.objects.select_related('user', 'municipio').order_by('-fecha_diligenciamiento')
         autos   = DeclaracionAutoRetencion.objects.select_related('user', 'municipio').order_by('-fecha_diligenciamiento')
+        retes   = DeclaracionRetencionICA.objects.select_related('user', 'municipio').order_by('-fecha_diligenciamiento')
         visitas = VisitaRITMovil.objects.select_related('funcionario', 'registro_rit').order_by('-fecha_visita')
 
         if filtro_documento:
             rits    = rits.filter(numero_documento__icontains=filtro_documento)
             icas    = icas.filter(numero_documento__icontains=filtro_documento)
             autos   = autos.filter(numero_documento__icontains=filtro_documento)
+            retes   = retes.filter(numero_documento__icontains=filtro_documento)
             visitas = visitas.filter(numero_documento__icontains=filtro_documento)
 
         if filtro_proceso == 'RIT':
-            icas = DeclaracionICA.objects.none(); autos = DeclaracionAutoRetencion.objects.none(); visitas = VisitaRITMovil.objects.none()
+            icas = DeclaracionICA.objects.none(); autos = DeclaracionAutoRetencion.objects.none(); retes = DeclaracionRetencionICA.objects.none(); visitas = VisitaRITMovil.objects.none()
         elif filtro_proceso == 'ICA':
-            rits = RegistroRIT.objects.none(); autos = DeclaracionAutoRetencion.objects.none(); visitas = VisitaRITMovil.objects.none()
+            rits = RegistroRIT.objects.none(); autos = DeclaracionAutoRetencion.objects.none(); retes = DeclaracionRetencionICA.objects.none(); visitas = VisitaRITMovil.objects.none()
         elif filtro_proceso == 'AUTO':
-            rits = RegistroRIT.objects.none(); icas = DeclaracionICA.objects.none(); visitas = VisitaRITMovil.objects.none()
+            rits = RegistroRIT.objects.none(); icas = DeclaracionICA.objects.none(); retes = DeclaracionRetencionICA.objects.none(); visitas = VisitaRITMovil.objects.none()
+        elif filtro_proceso == 'RETE':
+            rits = RegistroRIT.objects.none(); icas = DeclaracionICA.objects.none(); autos = DeclaracionAutoRetencion.objects.none(); visitas = VisitaRITMovil.objects.none()
         elif filtro_proceso == 'VISITA':
-            rits = RegistroRIT.objects.none(); icas = DeclaracionICA.objects.none(); autos = DeclaracionAutoRetencion.objects.none()
+            rits = RegistroRIT.objects.none(); icas = DeclaracionICA.objects.none(); autos = DeclaracionAutoRetencion.objects.none(); retes = DeclaracionRetencionICA.objects.none()
     else:
         from django.db.models import Q
         rits    = RegistroRIT.objects.filter(user=request.user).select_related('municipio_notificacion').order_by('-fecha')
         icas    = DeclaracionICA.objects.filter(user=request.user).select_related('municipio').order_by('-fecha_diligenciamiento')
         autos   = DeclaracionAutoRetencion.objects.filter(user=request.user).select_related('municipio').order_by('-fecha_diligenciamiento')
+        retes   = DeclaracionRetencionICA.objects.filter(user=request.user).select_related('municipio').order_by('-fecha_diligenciamiento')
         # El visitador ve sus propias visitas; el contribuyente ve las visitas donde está vinculado
         visitas = VisitaRITMovil.objects.filter(
             Q(funcionario=request.user) | Q(contribuyente=request.user)
@@ -725,6 +731,7 @@ def tasks_completed(request):
         "rits": rits,
         "icas": icas,
         "autos": autos,
+        "retes": retes,
         "visitas": visitas,
         "is_admin": is_admin_user,
         "is_revisor": is_revisor_user,
@@ -2437,19 +2444,335 @@ def reiniciar_firma_auto(request, declaracion_id):
     return redirect('verificar_firma_auto', declaracion_id=declaracion.id)
 
 
+def _enviar_otp_firma_rete(email_destino, nombre, otp_code, declaracion, tipo):
+    """Envía el correo OTP de firma electrónica RETE via EmailJS."""
+    etiquetas = {'contador': 'Contador', 'revisor': 'Revisor Fiscal', 'declarante': 'Declarante'}
+    rol = etiquetas.get(tipo, 'Firmante')
+    radicado = getattr(declaracion, 'radicado', None) or declaracion.id
+    if email_destino:
+        _enviar_emailjs(
+            django_settings.EMAILJS_TEMPLATE_OTP,
+            email_destino,
+            {'to_name': nombre, 'codigo': otp_code, 'tipo_formulario': f'RETE — {rol}', 'radicado': radicado},
+        )
+
+
 @login_required
 def proceso_rete(request):
-    if request.method == "GET":
-        return render(request, "formularios/rete.html", {"form": ReteForm()})
+    if is_admin(request.user):
+        return redirect('admin_panel')
 
-    form = ReteForm(request.POST)
-    if form.is_valid():
-        obj = form.save(commit=False)
-        obj.user = request.user
-        obj.save()
-        return redirect("tasks")
+    if not tiene_acceso(request.user, 'RETE'):
+        return redirect('tasks')
 
-    return render(request, "formularios/rete.html", {"form": form})
+    from catalogos.models import ActividadEconomica
+    from .models import DeclaracionRetencionICA, DeclaracionActividadRete, FirmaOTPRete
+    perfil = getattr(request.user, 'perfil', None)
+    es_alcaldia = request.user.groups.filter(name='ALCALDIA_GESTION').exists()
+
+    tarifas_json = json.dumps({
+        str(a.id): {'tarifa': float(a.tarifa), 'tipo': a.tipo, 'codigo': a.codigo}
+        for a in ActividadEconomica.objects.all()
+    }, cls=DjangoJSONEncoder)
+
+    from catalogos.models import Municipio
+    mun_depto_map = {m.id: m.departamento.nombre for m in Municipio.objects.select_related('departamento')}
+
+    declaraciones_anteriores = list(
+        DeclaracionRetencionICA.objects.filter(user=request.user, firma_otp_verificada=True)
+        .order_by('-anio_gravable', '-bimestre')
+        .values('id', 'anio_gravable', 'bimestre', 'opcion_uso')
+    )
+
+    bimestres_con_inicial = list(
+        DeclaracionRetencionICA.objects.filter(user=request.user, opcion_uso='INICIAL', firma_otp_verificada=True)
+        .values_list('anio_gravable', 'bimestre')
+    )
+    bimestres_con_inicial_json = json.dumps([{'anio': a, 'bimestre': b} for a, b in bimestres_con_inicial])
+
+    editar_id = None
+
+    if request.method == 'GET':
+        editar_id = request.GET.get('editar')
+        instance = None
+        actividades_existentes = []
+
+        if editar_id:
+            instance = get_object_or_404(DeclaracionRetencionICA, id=editar_id, user=request.user)
+            if instance.firma_otp_verificada:
+                return redirect('tasks')
+            actividades_existentes = list(instance.actividades.select_related('actividad').order_by('orden'))
+            bimestres_con_inicial_json = json.dumps([
+                {'anio': a, 'bimestre': b} for a, b in bimestres_con_inicial
+                if not (a == instance.anio_gravable and b == instance.bimestre)
+            ])
+
+        actividades_existentes_json = json.dumps([
+            {
+                'actividad_id': a.actividad_id,
+                'valor_base': a.valor_base,
+                'tarifa': float(a.tarifa),
+            }
+            for a in actividades_existentes
+        ], cls=DjangoJSONEncoder)
+
+        form = ReteForm(
+            instance=instance,
+            perfil=perfil if not instance else None,
+            user=request.user,
+        )
+        return render(request, 'formularios/rete.html', {
+            'form': form,
+            'tarifas_json': tarifas_json,
+            'mun_depto_json': json.dumps(mun_depto_map, cls=DjangoJSONEncoder),
+            'perfil': perfil,
+            'declaraciones_anteriores': declaraciones_anteriores,
+            'bimestres_con_inicial_json': bimestres_con_inicial_json,
+            'es_alcaldia': es_alcaldia,
+            'editar_id': editar_id,
+            'actividades_existentes': actividades_existentes,
+            'actividades_existentes_json': actividades_existentes_json,
+            'actividades_opciones': ActividadEconomica.objects.order_by('codigo'),
+        })
+
+    # POST
+    editar_id = request.POST.get('editar_id')
+    instance = None
+    if editar_id:
+        instance = get_object_or_404(DeclaracionRetencionICA, id=editar_id, user=request.user)
+        if instance.firma_otp_verificada:
+            return redirect('tasks')
+
+    form = ReteForm(request.POST, instance=instance, user=request.user, perfil=perfil)
+
+    actividades_data = []
+    idx = 0
+    while True:
+        act_id = request.POST.get(f'actividad_id_{idx}')
+        if act_id is None:
+            break
+        valor_base_raw = request.POST.get(f'valor_base_{idx}', '0')
+        tarifa_raw = request.POST.get(f'tarifa_{idx}', '0')
+        def parse_money(v):
+            try:
+                return int(str(v).replace('.', '').replace(',', '').strip())
+            except Exception:
+                return 0
+        def parse_tarifa(v):
+            try:
+                return float(str(v).replace(',', '.').strip())
+            except Exception:
+                return 0
+        actividades_data.append({
+            'actividad_id': int(act_id) if act_id else None,
+            'valor_base': parse_money(valor_base_raw),
+            'tarifa': parse_tarifa(tarifa_raw),
+        })
+        idx += 1
+
+    errors = []
+    if not actividades_data:
+        errors.append('Debe agregar al menos una actividad económica.')
+
+    _render_ctx_post = {
+        'tarifas_json': tarifas_json,
+        'mun_depto_json': json.dumps(mun_depto_map, cls=DjangoJSONEncoder),
+        'perfil': perfil,
+        'declaraciones_anteriores': declaraciones_anteriores,
+        'bimestres_con_inicial_json': bimestres_con_inicial_json,
+        'es_alcaldia': es_alcaldia,
+        'editar_id': editar_id,
+        'actividades_existentes': [],
+        'actividades_existentes_json': '[]',
+        'actividades_opciones': ActividadEconomica.objects.order_by('codigo'),
+    }
+
+    if not form.is_valid():
+        _render_ctx_post['form'] = form
+        _render_ctx_post['errores_actividades'] = errors
+        return render(request, 'formularios/rete.html', _render_ctx_post)
+
+    if errors:
+        _render_ctx_post['form'] = form
+        _render_ctx_post['errores_actividades'] = errors
+        return render(request, 'formularios/rete.html', _render_ctx_post)
+
+    declaracion = form.save(commit=False)
+    declaracion.user = request.user
+    declaracion.asignar_departamento()
+    declaracion.asignar_departamento_notificacion()
+    declaracion.save()
+
+    if editar_id:
+        declaracion.otps_firma.all().update(usado=True)
+        declaracion.contador_firma_verificada = False
+        declaracion.revisor_firma_verificada = False
+        declaracion.firma_otp_verificada = False
+        declaracion.save(update_fields=['contador_firma_verificada', 'revisor_firma_verificada', 'firma_otp_verificada'])
+
+    declaracion.actividades.all().delete()
+    for orden, act_data in enumerate(actividades_data, 1):
+        if not act_data['actividad_id']:
+            continue
+        try:
+            actividad = ActividadEconomica.objects.get(pk=act_data['actividad_id'])
+        except ActividadEconomica.DoesNotExist:
+            continue
+        valor_base = act_data['valor_base']
+        tarifa = act_data['tarifa']
+        valor_retencion = int(round(float(valor_base) * float(tarifa) / 1000))
+        DeclaracionActividadRete.objects.create(
+            declaracion=declaracion,
+            actividad=actividad,
+            valor_base=valor_base,
+            tarifa=tarifa,
+            valor_retencion=valor_retencion,
+            orden=orden,
+        )
+
+    declaracion.recalcular_totales()
+
+    if es_alcaldia:
+        import hashlib
+        hash_data = f"RETE|{declaracion.id}|{declaracion.user_id}|{declaracion.anio_gravable}|{declaracion.bimestre}|{declaracion.total_a_pagar}"
+        declaracion.firma_otp_verificada = True
+        declaracion.firma_timestamp = timezone.now()
+        declaracion.firma_hash = hashlib.sha256(hash_data.encode()).hexdigest()
+        declaracion.save(update_fields=['firma_otp_verificada', 'firma_timestamp', 'firma_hash'])
+        return redirect('tasks_completed')
+
+    otp_code = ''.join(random.choices(string.digits, k=6))
+    if declaracion.tiene_contador and declaracion.contador_email:
+        FirmaOTPRete.objects.create(declaracion=declaracion, codigo=otp_code, tipo='contador')
+        _enviar_otp_firma_rete(declaracion.contador_email, declaracion.contador_nombre or 'Contador', otp_code, declaracion, 'contador')
+    elif declaracion.tiene_revisor_fiscal and declaracion.revisor_email:
+        FirmaOTPRete.objects.create(declaracion=declaracion, codigo=otp_code, tipo='revisor')
+        _enviar_otp_firma_rete(declaracion.revisor_email, declaracion.revisor_nombre or 'Revisor', otp_code, declaracion, 'revisor')
+    else:
+        email_declarante = declaracion.rep_legal_email or request.user.email or ''
+        nombre_declarante = declaracion.rep_legal_nombre or request.user.get_full_name() or request.user.username
+        FirmaOTPRete.objects.create(declaracion=declaracion, codigo=otp_code, tipo='declarante')
+        _enviar_otp_firma_rete(email_declarante, nombre_declarante, otp_code, declaracion, 'declarante')
+
+    return redirect('verificar_firma_rete', declaracion_id=declaracion.id)
+
+
+@login_required
+def verificar_firma_rete(request, declaracion_id):
+    from .models import DeclaracionRetencionICA, FirmaOTPRete
+    declaracion = get_object_or_404(DeclaracionRetencionICA, id=declaracion_id, user=request.user)
+    if declaracion.firma_otp_verificada:
+        return redirect('tasks_completed')
+
+    if declaracion.tiene_contador and not declaracion.contador_firma_verificada:
+        paso_actual = 'contador'
+        email_mostrar = declaracion.contador_email
+        nombre_mostrar = declaracion.contador_nombre or 'Contador'
+    elif declaracion.tiene_revisor_fiscal and not declaracion.revisor_firma_verificada:
+        paso_actual = 'revisor'
+        email_mostrar = declaracion.revisor_email
+        nombre_mostrar = declaracion.revisor_nombre or 'Revisor Fiscal'
+    else:
+        paso_actual = 'declarante'
+        email_mostrar = declaracion.rep_legal_email or request.user.email or ''
+        nombre_mostrar = declaracion.rep_legal_nombre or request.user.get_full_name() or request.user.username
+
+    if request.method == 'GET':
+        return render(request, 'formularios/verificar_firma_rete.html', {
+            'declaracion': declaracion,
+            'paso_actual': paso_actual,
+            'email_mostrar': email_mostrar,
+            'nombre_mostrar': nombre_mostrar,
+        })
+
+    action = request.POST.get('action', 'verificar')
+
+    if action == 'reenviar':
+        declaracion.otps_firma.filter(tipo=paso_actual, usado=False).update(usado=True)
+        otp_code = ''.join(random.choices(string.digits, k=6))
+        FirmaOTPRete.objects.create(declaracion=declaracion, codigo=otp_code, tipo=paso_actual)
+        _enviar_otp_firma_rete(email_mostrar, nombre_mostrar, otp_code, declaracion, paso_actual)
+        return render(request, 'formularios/verificar_firma_rete.html', {
+            'declaracion': declaracion,
+            'paso_actual': paso_actual,
+            'email_mostrar': email_mostrar,
+            'nombre_mostrar': nombre_mostrar,
+            'mensaje': 'Se reenvió el código.',
+        })
+
+    codigo_ingresado = request.POST.get('codigo', '').strip()
+    limite = timezone.now() - timezone.timedelta(minutes=15)
+    otp_obj = declaracion.otps_firma.filter(tipo=paso_actual, usado=False, creado_en__gte=limite).order_by('-creado_en').first()
+
+    if not otp_obj or otp_obj.codigo != codigo_ingresado:
+        return render(request, 'formularios/verificar_firma_rete.html', {
+            'declaracion': declaracion,
+            'paso_actual': paso_actual,
+            'email_mostrar': email_mostrar,
+            'nombre_mostrar': nombre_mostrar,
+            'error': 'Código inválido o expirado.',
+        })
+
+    otp_obj.usado = True
+    otp_obj.save()
+
+    if paso_actual == 'contador':
+        declaracion.contador_firma_verificada = True
+        declaracion.save(update_fields=['contador_firma_verificada'])
+        otp_code = ''.join(random.choices(string.digits, k=6))
+        if declaracion.tiene_revisor_fiscal and declaracion.revisor_email:
+            FirmaOTPRete.objects.create(declaracion=declaracion, codigo=otp_code, tipo='revisor')
+            _enviar_otp_firma_rete(declaracion.revisor_email, declaracion.revisor_nombre or 'Revisor', otp_code, declaracion, 'revisor')
+        else:
+            email_d = declaracion.rep_legal_email or request.user.email or ''
+            nombre_d = declaracion.rep_legal_nombre or request.user.get_full_name() or request.user.username
+            FirmaOTPRete.objects.create(declaracion=declaracion, codigo=otp_code, tipo='declarante')
+            _enviar_otp_firma_rete(email_d, nombre_d, otp_code, declaracion, 'declarante')
+        return redirect('verificar_firma_rete', declaracion_id=declaracion.id)
+
+    elif paso_actual == 'revisor':
+        declaracion.revisor_firma_verificada = True
+        declaracion.save(update_fields=['revisor_firma_verificada'])
+        otp_code = ''.join(random.choices(string.digits, k=6))
+        email_d = declaracion.rep_legal_email or request.user.email or ''
+        nombre_d = declaracion.rep_legal_nombre or request.user.get_full_name() or request.user.username
+        FirmaOTPRete.objects.create(declaracion=declaracion, codigo=otp_code, tipo='declarante')
+        _enviar_otp_firma_rete(email_d, nombre_d, otp_code, declaracion, 'declarante')
+        return redirect('verificar_firma_rete', declaracion_id=declaracion.id)
+
+    else:
+        import hashlib
+        hash_data = f"RETE|{declaracion.id}|{declaracion.user_id}|{declaracion.anio_gravable}|{declaracion.bimestre}|{declaracion.total_a_pagar}"
+        declaracion.firma_otp_verificada = True
+        declaracion.firma_timestamp = timezone.now()
+        declaracion.firma_hash = hashlib.sha256(hash_data.encode()).hexdigest()
+        declaracion.save(update_fields=['firma_otp_verificada', 'firma_timestamp', 'firma_hash'])
+        return redirect('tasks_completed')
+
+
+@login_required
+def reiniciar_firma_rete(request, declaracion_id):
+    from .models import DeclaracionRetencionICA, FirmaOTPRete
+    declaracion = get_object_or_404(DeclaracionRetencionICA, id=declaracion_id, user=request.user)
+    if declaracion.firma_otp_verificada:
+        return redirect('tasks_completed')
+    declaracion.otps_firma.all().update(usado=True)
+    declaracion.contador_firma_verificada = False
+    declaracion.revisor_firma_verificada = False
+    declaracion.save(update_fields=['contador_firma_verificada', 'revisor_firma_verificada'])
+    otp_code = ''.join(random.choices(string.digits, k=6))
+    if declaracion.tiene_contador and declaracion.contador_email:
+        FirmaOTPRete.objects.create(declaracion=declaracion, codigo=otp_code, tipo='contador')
+        _enviar_otp_firma_rete(declaracion.contador_email, declaracion.contador_nombre or 'Contador', otp_code, declaracion, 'contador')
+    elif declaracion.tiene_revisor_fiscal and declaracion.revisor_email:
+        FirmaOTPRete.objects.create(declaracion=declaracion, codigo=otp_code, tipo='revisor')
+        _enviar_otp_firma_rete(declaracion.revisor_email, declaracion.revisor_nombre or 'Revisor', otp_code, declaracion, 'revisor')
+    else:
+        email_d = declaracion.rep_legal_email or request.user.email or ''
+        nombre_d = declaracion.rep_legal_nombre or request.user.get_full_name() or request.user.username
+        FirmaOTPRete.objects.create(declaracion=declaracion, codigo=otp_code, tipo='declarante')
+        _enviar_otp_firma_rete(email_d, nombre_d, otp_code, declaracion, 'declarante')
+    return redirect('verificar_firma_rete', declaracion_id=declaracion.id)
 
 
 # ----------------------------
@@ -3871,20 +4194,6 @@ def generar_pdf_ica(request, ica_id):
             ('BACKGROUND', (2, r), (3, r), colors.HexColor('#fff3cd')),
         )
 
-    # ── NOTA ──────────────────────────────────────────────────────────
-    _ST_NOTA = ParagraphStyle('_nota', fontName='Helvetica-Bold', fontSize=10, leading=13)
-    r = ri()
-    rows.append(['', '', Paragraph(
-        '<b>NOTA:</b> Para realizar el pago del valor declarado, la administración municipal le enviará '
-        'el documento de cobro al correo electrónico suministrado, el cual se entiende como correo de notificación.',
-        _ST_NOTA
-    ), ''])
-    add_ts(
-        ('SPAN', (0, r), (1, r)),
-        ('SPAN', (2, r), (3, r)),
-        ('TOPPADDING',    (0, r), (-1, r), 6),
-        ('BOTTOMPADDING', (0, r), (-1, r), 6),
-    )
 
     # ── Aplicar estilos globales y construir tabla principal ───────────
     add_ts(
@@ -4413,20 +4722,6 @@ def generar_pdf_auto(request, auto_id):
             ('BACKGROUND', (2, r), (3, r), colors.HexColor('#fff3cd')),
         )
 
-    # ── NOTA ──────────────────────────────────────────────────────────
-    _ST_NOTA = ParagraphStyle('_nota', fontName='Helvetica-Bold', fontSize=10, leading=13)
-    r = ri()
-    rows.append(['', '', Paragraph(
-        '<b>NOTA:</b> Para realizar el pago del valor declarado, la administración municipal le enviará '
-        'el documento de cobro al correo electrónico suministrado, el cual se entiende como correo de notificación.',
-        _ST_NOTA
-    ), ''])
-    add_ts(
-        ('SPAN', (0, r), (1, r)),
-        ('SPAN', (2, r), (3, r)),
-        ('TOPPADDING',    (0, r), (-1, r), 6),
-        ('BOTTOMPADDING', (0, r), (-1, r), 6),
-    )
 
     # ── Estilos globales y tabla principal ────────────────────────────
     add_ts(
@@ -4461,6 +4756,242 @@ def generar_pdf_auto(request, auto_id):
     response = HttpResponse(buffer, content_type='application/pdf')
     disp = 'inline' if request.GET.get('inline') else 'attachment'
     response['Content-Disposition'] = f'{disp}; filename="AUTO_{auto.anio_gravable}_B{auto.bimestre}_{auto.id}.pdf"'
+    return response
+
+
+@login_required
+def generar_pdf_rete(request, rete_id):
+    """Genera PDF de una declaración de Retención ICA."""
+    from .models import DeclaracionRetencionICA
+    rete = get_object_or_404(DeclaracionRetencionICA, id=rete_id)
+
+    if not is_admin(request.user) and rete.user != request.user:
+        messages.error(request, 'No tienes permiso para ver este documento.')
+        return redirect('tasks_completed')
+
+    config = get_pdf_config()
+    _radicado_title = f"RETE-{rete.anio_gravable}-B{rete.bimestre}-{rete.id:06d}"
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=letter,
+        topMargin=0.4 * inch, bottomMargin=0.4 * inch,
+        leftMargin=0.5 * inch, rightMargin=0.5 * inch,
+        title=_radicado_title,
+    )
+
+    styles = get_pdf_styles(config)
+    elements = []
+
+    municipio_nombre = rete.municipio.nombre if rete.municipio else config['nombre_entidad']
+
+    _h_logo = 0.9 * inch
+    _logo_l = ''
+    if config['logo_izquierdo'] and os.path.exists(config['logo_izquierdo']):
+        try:
+            _tmp = Image(config['logo_izquierdo'])
+            _asp = _tmp.imageWidth / _tmp.imageHeight if _tmp.imageHeight else 1
+            _logo_l = Image(config['logo_izquierdo'], width=_h_logo * _asp, height=_h_logo)
+        except Exception:
+            pass
+
+    _hdr_centro = Paragraph(
+        f'<b>DECLARACIÓN BIMESTRAL DE RETENCIÓN DEL IMPUESTO DE INDUSTRIA Y COMERCIO</b><br/>'
+        f'<font size="8">{municipio_nombre}</font>',
+        ParagraphStyle('_hc', fontName='Helvetica-Bold', fontSize=10, leading=12, alignment=TA_CENTER)
+    )
+    _MESES_ES = {1: 'enero', 2: 'febrero', 3: 'marzo', 4: 'abril', 5: 'mayo', 6: 'junio',
+                 7: 'julio', 8: 'agosto', 9: 'septiembre', 10: 'octubre', 11: 'noviembre', 12: 'diciembre'}
+    _fecha_rad_dt = rete.firma_timestamp or rete.fecha_diligenciamiento
+    _fecha_rad_str = f"{_fecha_rad_dt.day} de {_MESES_ES[_fecha_rad_dt.month]} de {_fecha_rad_dt.year}" if _fecha_rad_dt else ''
+    _hdr_rad = Paragraph(
+        f'<b>Radicado:</b> {_radicado_title}<br/>'
+        + (f'<font size="7">Fecha: {_fecha_rad_str}</font>' if _fecha_rad_str else ''),
+        ParagraphStyle('_hr', fontName='Helvetica-Bold', fontSize=8, leading=10,
+                       alignment=TA_RIGHT, textColor=colors.HexColor(config['color_radicado']))
+    )
+    _hdr_t = Table(
+        [[_logo_l, _hdr_centro, _hdr_rad]],
+        colWidths=[1.0 * inch, 5.5 * inch, 1.0 * inch]
+    )
+    _hdr_t.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+        ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
+    ]))
+    elements.append(_hdr_t)
+    elements.append(HRFlowable(width="100%", thickness=2,
+                               color=colors.HexColor(config['color_primario']),
+                               spaceBefore=4, spaceAfter=6))
+
+    def fmt_cop(val):
+        try:
+            return f"${int(val or 0):,.0f}".replace(',', '.')
+        except Exception:
+            return "$0"
+
+    C_LBL = colors.HexColor(config['color_primario'])
+    C_GOOD = colors.HexColor(config['color_exito'])
+    C_GRAY = colors.HexColor('#f2f2f2')
+    C_BORDER = colors.HexColor('#999999')
+
+    fs = 8
+    ST = ParagraphStyle('_n', fontName='Helvetica', fontSize=fs, leading=10)
+    STB = ParagraphStyle('_b', fontName='Helvetica-Bold', fontSize=fs, leading=10)
+    STV = ParagraphStyle('_v', fontName='Helvetica', fontSize=fs, leading=10, alignment=TA_RIGHT)
+    STVB = ParagraphStyle('_vb', fontName='Helvetica-Bold', fontSize=fs, leading=10, alignment=TA_RIGHT)
+    STH = ParagraphStyle('_h', fontName='Helvetica-Bold', fontSize=9, leading=11, alignment=TA_CENTER, textColor=colors.white)
+
+    def _sect(label):
+        t = Table([[Paragraph(f'<b>{label}</b>', STH)]], colWidths=[7.5 * inch])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), C_LBL),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 4))
+
+    # === Datos generales ===
+    _sect('DATOS DEL CONTRIBUYENTE')
+    data = [
+        [Paragraph('<b>Año gravable:</b>', ST), Paragraph(str(rete.anio_gravable), ST),
+         Paragraph('<b>Bimestre:</b>', ST), Paragraph(rete.get_bimestre_display(), ST)],
+        [Paragraph('<b>Tipo declaración:</b>', ST), Paragraph(rete.get_opcion_uso_display(), ST),
+         Paragraph('<b>Municipio:</b>', ST), Paragraph(municipio_nombre or '-', ST)],
+        [Paragraph('<b>Nombre/Razón Social:</b>', ST), Paragraph(rete.nombre_razon_social or '-', ST),
+         Paragraph('<b>Documento:</b>', ST), Paragraph(f"{rete.get_tipo_documento_display() or ''} {rete.numero_documento or ''}", ST)],
+        [Paragraph('<b>Dirección:</b>', ST), Paragraph(rete.direccion_notificacion or '-', ST),
+         Paragraph('<b>Teléfono:</b>', ST), Paragraph(rete.telefono or '-', ST)],
+        [Paragraph('<b>Correo:</b>', ST), Paragraph(rete.correo_electronico or '-', ST),
+         Paragraph('<b>Clasificación:</b>', ST), Paragraph(rete.get_clasificacion_contribuyente_display() or '-', ST)],
+    ]
+    t = Table(data, colWidths=[1.6 * inch, 2.4 * inch, 1.4 * inch, 2.1 * inch])
+    t.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.4, C_BORDER),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 8))
+
+    # === Tabla actividades ===
+    _sect('B. ACTIVIDADES ECONÓMICAS')
+    headers = [
+        Paragraph('<b>#</b>', STH),
+        Paragraph('<b>Actividad Económica</b>', STH),
+        Paragraph('<b>Valor Base</b>', STH),
+        Paragraph('<b>Tarifa (x mil)</b>', STH),
+        Paragraph('<b>Valor Retención</b>', STH),
+    ]
+    rows_act = [headers]
+    actividades = rete.actividades.select_related('actividad').order_by('orden')
+    for i, act in enumerate(actividades, 1):
+        rows_act.append([
+            Paragraph(str(i), ST),
+            Paragraph(f"{act.actividad.codigo} - {act.actividad.nombre}", ST),
+            Paragraph(fmt_cop(act.valor_base), STV),
+            Paragraph(str(float(act.tarifa)), STV),
+            Paragraph(fmt_cop(act.valor_retencion), STV),
+        ])
+    rows_act.append([
+        Paragraph('<b>TOTAL</b>', STB), '', '', '',
+        Paragraph(f'<b>{fmt_cop(rete.total_valor_retencion)}</b>', STVB),
+    ])
+    t = Table(rows_act, colWidths=[0.3 * inch, 4.0 * inch, 1.2 * inch, 0.8 * inch, 1.2 * inch])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), C_LBL),
+        ('GRID', (0, 0), (-1, -1), 0.4, C_BORDER),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('SPAN', (0, -1), (3, -1)),
+        ('ALIGN', (0, -1), (3, -1), 'RIGHT'),
+        ('BACKGROUND', (0, -1), (-1, -1), C_GRAY),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 8))
+
+    # === Liquidación D ===
+    _sect('D. LIQUIDACIÓN DEL IMPUESTO')
+    liq = [
+        [Paragraph('<b>D1. Total retenciones</b>', ST), Paragraph(fmt_cop(rete.total_valor_retencion), STV)],
+        [Paragraph('<b>D2. Devoluciones, anulaciones, rescisiones, retenciones practicadas en exceso</b>', ST),
+         Paragraph(fmt_cop(rete.devoluciones), STV)],
+        [Paragraph('<b>D3. SUBTOTAL retenciones practicadas menos devoluciones</b>', ST),
+         Paragraph(fmt_cop(rete.subtotal_retenciones), STVB)],
+        [Paragraph(f'<b>D4. Sanciones</b> ({rete.get_tipo_sancion_display() or "Ninguna"})', ST),
+         Paragraph(fmt_cop(rete.sanciones), STV)],
+        [Paragraph('<b>D5. Intereses de mora</b>', ST),
+         Paragraph(fmt_cop(rete.intereses_mora), STV)],
+        [Paragraph('<b>D6. TOTAL A PAGAR (D3 + D4 + D5)</b>', STB),
+         Paragraph(f'<b>{fmt_cop(rete.total_a_pagar)}</b>', STVB)],
+    ]
+    t = Table(liq, colWidths=[5.5 * inch, 2.0 * inch])
+    t.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.4, C_BORDER),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        ('BACKGROUND', (0, 2), (-1, 2), C_GRAY),
+        ('BACKGROUND', (0, -1), (-1, -1), C_GOOD),
+        ('TEXTCOLOR', (0, -1), (-1, -1), colors.white),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 10))
+
+    # === Firmas ===
+    _sect('F. FIRMAS')
+    firma_data = [
+        [
+            Paragraph('<b>FIRMA DEL DECLARANTE</b>', ST),
+            Paragraph('<b>FIRMA DEL CONTADOR</b>', ST),
+            Paragraph('<b>REVISOR FISCAL</b>', ST),
+        ],
+        [
+            Paragraph(f"Nombre: {rete.rep_legal_nombre or '-'}", ST),
+            Paragraph(f"Nombre: {rete.contador_nombre or '-'}", ST),
+            Paragraph(f"Nombre: {rete.revisor_nombre or '-'}", ST),
+        ],
+        [
+            Paragraph(f"CC: {rete.rep_legal_numero_documento or '-'}", ST),
+            Paragraph(f"CC: {rete.contador_numero_documento or '-'}<br/>T.P.: {rete.contador_tarjeta_profesional or '-'}", ST),
+            Paragraph(f"CC: {rete.revisor_numero_documento or '-'}<br/>T.P.: {rete.revisor_tarjeta_profesional or '-'}", ST),
+        ],
+    ]
+    t = Table(firma_data, colWidths=[2.5 * inch, 2.5 * inch, 2.5 * inch])
+    t.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.4, C_BORDER),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 6))
+
+    if rete.firma_otp_verificada:
+        elements.append(Paragraph(
+            f"✓ FIRMA ELECTRÓNICA VERIFICADA — Ley 527 de 1999 — Fecha/Hora: "
+            f"{rete.firma_timestamp.strftime('%Y-%m-%d %H:%M:%S UTC') if rete.firma_timestamp else ''} — "
+            f"Hash SHA-256: {rete.firma_hash or '-'}",
+            ParagraphStyle('_fv', fontName='Helvetica', fontSize=7, leading=9,
+                           textColor=colors.HexColor('#155724'),
+                           backColor=colors.HexColor('#d4edda'),
+                           borderPadding=4)
+        ))
+
+    doc.build(elements)
+    buffer.seek(0)
+
+    response = HttpResponse(buffer, content_type='application/pdf')
+    disp = 'inline' if request.GET.get('inline') else 'attachment'
+    response['Content-Disposition'] = f'{disp}; filename="RETE_{rete.anio_gravable}_B{rete.bimestre}_{rete.id}.pdf"'
     return response
 
 

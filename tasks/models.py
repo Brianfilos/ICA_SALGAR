@@ -1267,6 +1267,159 @@ class RetencionICA(models.Model):
 
 
 # =========================
+# DECLARACIÓN DE RETENCIÓN ICA
+# =========================
+class DeclaracionRetencionICA(models.Model):
+    BIMESTRE_CHOICES = [
+        ('01', 'Bimestre 01'), ('02', 'Bimestre 02'), ('03', 'Bimestre 03'),
+        ('04', 'Bimestre 04'), ('05', 'Bimestre 05'), ('06', 'Bimestre 06'),
+    ]
+    OPCION_USO_CHOICES = [
+        ('INICIAL', 'Declaración inicial'), ('CORRECCION', 'Corrección'),
+    ]
+    TIPO_DOCUMENTO_CHOICES = (
+        ('CC', 'Cédula de ciudadanía'), ('NIT', 'NIT'), ('PASAPORTE', 'Pasaporte'),
+        ('CE', 'Cédula de extranjería'), ('OTRO', 'Otro'),
+    )
+    CLASIFICACION_CONTRIBUYENTE_CHOICES = (
+        ('REGIMEN_COMUN', 'Régimen común de ICA'), ('REGIMEN_SIMPLE', 'Régimen simplificado'),
+        ('OTRA', 'Otra'),
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    municipio = models.ForeignKey('catalogos.Municipio', on_delete=models.PROTECT, related_name='retes_municipio')
+    departamento = models.ForeignKey('catalogos.Departamento', on_delete=models.PROTECT, null=True, blank=True, related_name='retes_departamento')
+    anio_gravable = models.PositiveIntegerField(verbose_name='Año gravable')
+    bimestre = models.CharField(max_length=2, choices=BIMESTRE_CHOICES, verbose_name='Bimestre')
+    opcion_uso = models.CharField(max_length=20, choices=OPCION_USO_CHOICES, default='INICIAL')
+    corrige_a = models.ForeignKey('self', on_delete=models.PROTECT, null=True, blank=True, related_name='correcciones')
+    fecha_diligenciamiento = models.DateTimeField(auto_now_add=True)
+
+    # Section A - Contributor Info
+    nombre_razon_social = models.CharField(max_length=255, blank=True, null=True)
+    tipo_documento = models.CharField(max_length=10, choices=TIPO_DOCUMENTO_CHOICES, blank=True, null=True)
+    numero_documento = models.CharField(max_length=30, blank=True, null=True)
+    dv = models.CharField(max_length=2, blank=True, null=True)
+    cual_documento = models.CharField(max_length=60, blank=True, null=True)
+    direccion_notificacion = models.CharField(max_length=255, blank=True, null=True)
+    municipio_notificacion = models.ForeignKey('catalogos.Municipio', on_delete=models.PROTECT, null=True, blank=True, related_name='retes_municipio_notificacion')
+    departamento_notificacion = models.ForeignKey('catalogos.Departamento', on_delete=models.PROTECT, null=True, blank=True, related_name='retes_departamento_notificacion')
+    telefono = models.CharField(max_length=30, blank=True, null=True)
+    correo_electronico = models.EmailField(blank=True, null=True)
+    numero_establecimientos = models.PositiveIntegerField(blank=True, null=True)
+    clasificacion_contribuyente = models.CharField(max_length=30, choices=CLASIFICACION_CONTRIBUYENTE_CHOICES, blank=True, null=True)
+    otra_clasificacion = models.CharField(max_length=80, blank=True, null=True)
+    tipo_persona = models.CharField(max_length=10, choices=[('NATURAL', 'Natural'), ('JURIDICA', 'Jurídica')], blank=True, null=True)
+    tipo_juridica = models.CharField(max_length=30, choices=[('SOCIEDAD', 'Sociedad'), ('CONSORCIO', 'Consorcio'), ('UNION_TEMPORAL', 'Unión temporal'), ('PATRIMONIO_AUTONOMO', 'Patrimonio autónomo'), ('OTRO', 'Otro')], blank=True, null=True)
+    otro_tipo_juridica = models.CharField(max_length=100, blank=True, null=True)
+
+    # Section D - Liquidación
+    TIPO_SANCION_CHOICES = [
+        ("NINGUNA", "Ninguna"),
+        ("EXTEMPORANEIDAD", "Extemporaneidad"),
+        ("CORRECCION", "Corrección"),
+        ("INEXACTITUD", "Inexactitud"),
+        ("OTRA", "Otra"),
+    ]
+    tipo_sancion = models.CharField(max_length=20, choices=TIPO_SANCION_CHOICES, blank=True, null=True, default="NINGUNA")
+    cual_sancion = models.CharField(max_length=100, blank=True, null=True)
+    sanciones = models.BigIntegerField(default=0)
+    intereses_mora = models.BigIntegerField(default=0)
+    devoluciones = models.BigIntegerField(default=0, verbose_name='Devoluciones, anulaciones, rescisiones, retenciones practicadas en exceso')
+
+    # Calculated totals
+    total_valor_retencion = models.BigIntegerField(default=0)
+    subtotal_retenciones = models.BigIntegerField(default=0, verbose_name='Subtotal retenciones menos devoluciones')
+    total_a_pagar = models.BigIntegerField(default=0)
+
+    # Signatures
+    tiene_contador = models.BooleanField(default=False)
+    tiene_revisor_fiscal = models.BooleanField(default=False)
+    contador_email = models.EmailField(blank=True, null=True)
+    revisor_email = models.EmailField(blank=True, null=True)
+    contador_firma_verificada = models.BooleanField(default=False)
+    revisor_firma_verificada = models.BooleanField(default=False)
+    contador_nombre = models.CharField(max_length=120, blank=True, null=True)
+    contador_tipo_documento = models.CharField(max_length=3, choices=[('CC', 'C.C.'), ('CE', 'C.E.'), ('TI', 'T.I.')], blank=True, null=True)
+    contador_numero_documento = models.CharField(max_length=30, blank=True, null=True)
+    contador_tarjeta_profesional = models.CharField(max_length=30, blank=True, null=True)
+    revisor_nombre = models.CharField(max_length=120, blank=True, null=True)
+    revisor_tipo_documento = models.CharField(max_length=3, choices=[('CC', 'C.C.'), ('CE', 'C.E.'), ('TI', 'T.I.')], blank=True, null=True)
+    revisor_numero_documento = models.CharField(max_length=30, blank=True, null=True)
+    revisor_tarjeta_profesional = models.CharField(max_length=30, blank=True, null=True)
+    rep_legal_email = models.EmailField(blank=True, null=True)
+    rep_legal_nombre = models.CharField(max_length=120, blank=True, null=True)
+    rep_legal_tipo_documento = models.CharField(max_length=3, choices=[('CC', 'C.C.'), ('CE', 'C.E.'), ('TI', 'T.I.')], blank=True, null=True)
+    rep_legal_numero_documento = models.CharField(max_length=30, blank=True, null=True)
+    firma_otp_verificada = models.BooleanField(default=False)
+    firma_timestamp = models.DateTimeField(null=True, blank=True)
+    firma_hash = models.CharField(max_length=64, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def asignar_departamento(self):
+        if self.municipio_id:
+            self.departamento = self.municipio.departamento
+
+    def asignar_departamento_notificacion(self):
+        if self.municipio_notificacion_id:
+            self.departamento_notificacion = self.municipio_notificacion.departamento
+
+    def recalcular_totales(self, save=True):
+        total_retencion = 0
+        for item in self.actividades.all():
+            valor = int(round(float(item.valor_base) * float(item.tarifa) / 1000))
+            item.valor_retencion = valor
+            item.save(update_fields=['valor_retencion'])
+            total_retencion += valor
+        self.total_valor_retencion = total_retencion
+        self.subtotal_retenciones = max(0, total_retencion - (self.devoluciones or 0))
+        self.total_a_pagar = self.subtotal_retenciones + (self.sanciones or 0) + (self.intereses_mora or 0)
+        if save:
+            self.save(update_fields=['total_valor_retencion', 'subtotal_retenciones', 'total_a_pagar'])
+        return {
+            'total_valor_retencion': self.total_valor_retencion,
+            'subtotal_retenciones': self.subtotal_retenciones,
+            'total_a_pagar': self.total_a_pagar,
+        }
+
+    def __str__(self):
+        return f"RETE {self.municipio} {self.anio_gravable} Bim.{self.bimestre} ({self.user}) - {self.opcion_uso}"
+
+    class Meta:
+        verbose_name = 'Declaración Retención ICA'
+        verbose_name_plural = 'Declaraciones Retención ICA'
+
+
+class DeclaracionActividadRete(models.Model):
+    declaracion = models.ForeignKey(DeclaracionRetencionICA, on_delete=models.CASCADE, related_name='actividades')
+    actividad = models.ForeignKey('catalogos.ActividadEconomica', on_delete=models.PROTECT)
+    valor_base = models.BigIntegerField(default=0)
+    tarifa = models.DecimalField(max_digits=10, decimal_places=6, default=0)
+    valor_retencion = models.BigIntegerField(default=0)
+    orden = models.PositiveSmallIntegerField(default=1)
+
+    class Meta:
+        ordering = ['orden']
+
+    def __str__(self):
+        return f"ReteAct {self.declaracion_id} - {self.actividad.codigo}"
+
+
+class FirmaOTPRete(models.Model):
+    declaracion = models.ForeignKey(DeclaracionRetencionICA, on_delete=models.CASCADE, related_name='otps_firma')
+    codigo = models.CharField(max_length=6)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    usado = models.BooleanField(default=False)
+    tipo = models.CharField(max_length=20, default='declarante', choices=[('declarante', 'Declarante'), ('contador', 'Contador'), ('revisor', 'Revisor Fiscal')])
+
+    class Meta:
+        ordering = ['-creado_en']
+
+    def __str__(self):
+        return f"OTP firma RETE #{self.declaracion_id}"
+
+
+# =========================
 # CONFIGURACIÓN PDF
 # =========================
 class ConfiguracionPDF(models.Model):
